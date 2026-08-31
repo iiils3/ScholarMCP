@@ -4,7 +4,8 @@ const exists=p=>fs.existsSync(p);
 const failures=[];
 function check(ok,msg){if(!ok)failures.push(msg)}
 const index=read('index.html');
-const puter=read('src/puter.ts');
+const bridge=read('src/puter.ts');
+const academicAI=read('src/academic-ai.ts');
 const app=read('src/ScholarApp.tsx');
 const parser=read('src/parser.ts');
 const academic=exists('src/AcademicHub.tsx')?read('src/AcademicHub.tsx'):'';
@@ -14,13 +15,13 @@ const exam=exists('src/ExamDNAStudio.tsx')?read('src/ExamDNAStudio.tsx'):'';
 const feed=exists('src/SmartFeed.tsx')?read('src/SmartFeed.tsx'):'';
 const day=exists('src/ScholarDay.tsx')?read('src/ScholarDay.tsx'):'';
 
-check(index.includes('https://js.puter.com/v2/'),'Cloud AI runtime is missing from index.html');
-check(puter.includes('img2txt'),'Cloud OCR bridge is missing');
-check(puter.includes('speech2txt'),'Cloud lecture transcription bridge is missing');
-check(puter.includes('txt2speech'),'Cloud TTS bridge is missing');
-check(puter.includes('txt2vid'),'Cloud study-video bridge is missing');
-check(!puter.includes("from './local-ai'"),'AI bridge still imports the on-device LLM');
-check(!puter.includes("from './local-ocr'"),'AI bridge still imports the on-device OCR');
+check(!/puter\.com|js\.puter|window\.puter/i.test(index+bridge+academicAI),'Third-party Puter login/runtime is still present');
+check(bridge.includes('scholarmcp-core-75hnna.v2.appdeploy.ai'),'ScholarMCP internal cloud core is missing');
+check(bridge.includes("corePost('ocr'")&&bridge.includes('ocrSource'),'Internal OCR bridge is missing');
+check(bridge.includes("corePost('transcribe'")&&bridge.includes('speechToText'),'Internal lecture transcription bridge is missing');
+check(bridge.includes('speechSynthesis'),'In-platform text-to-speech fallback is missing');
+check(!bridge.includes("from './local-ai'"),'AI bridge still imports the on-device LLM');
+check(!bridge.includes("from './local-ocr'"),'AI bridge still imports the on-device OCR');
 check(parser.includes("ext==='pdf'")&&parser.includes('ocrSource'),'PDF + OCR ingestion path missing');
 check(app.includes("view==='today'"),'Today route missing');
 check(app.includes("view==='courses'"),'Courses route missing');
@@ -46,4 +47,4 @@ check(feed.includes('reviewFSRS'),'Smart Feed is not tied to spaced repetition')
 check(day.includes('riskScore')&&day.includes('dueDate'),'Scholar Day is not adaptive to risk/reviews');
 
 if(failures.length){console.error('\nScholarMCP quality gate FAILED:\n- '+failures.join('\n- '));process.exit(1)}
-console.log('ScholarMCP quality gate passed: cloud runtime, ingestion, Course Brain, study, lecture, Academic OS, seminar, Exam DNA, Smart Feed and Scholar Day are wired.');
+console.log('ScholarMCP quality gate passed: no third-party login flow; internal cloud core, ingestion, Course Brain, lecture, Academic OS, seminar, Exam DNA, Smart Feed and Scholar Day are wired.');
