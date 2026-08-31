@@ -20,13 +20,7 @@ async function getDocling(){
 }
 
 function doctagsToText(raw:string){
-  return raw
-    .replace(/<loc_\d+>/g,' ')
-    .replace(/<[^>]+>/g,'\n')
-    .replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&')
-    .replace(/[ \t]+/g,' ')
-    .replace(/\n{3,}/g,'\n\n')
-    .trim();
+  return raw.replace(/<loc_\d+>/g,' ').replace(/<[^>]+>/g,'\n').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&').replace(/[ \t]+/g,' ').replace(/\n{3,}/g,'\n\n').trim();
 }
 
 export async function structuredOCR(blob:Blob){
@@ -66,9 +60,11 @@ async function getTrocr(){
   return trocrPromise;
 }
 
+function generatedText(result:any){const item=Array.isArray(result)?result[0]:result;return String(item?.generated_text??item?.text??'').trim()}
+
 export async function handwrittenOCR(blob:Blob){
   const lines=await splitHandwrittenLines(blob);const pipe=await getTrocr();const text:string[]=[];let n=0;
-  for(const line of lines){n++;emit(`قراءة سطر يدوي ${n} من ${lines.length}`,n/lines.length);const result=await blobUrl(line,url=>pipe(url,{max_new_tokens:128}));const x=Array.isArray(result)?result[0]?.generated_text:result?.generated_text;if(String(x||'').trim())text.push(String(x).trim())}
+  for(const line of lines){n++;emit(`قراءة سطر يدوي ${n} من ${lines.length}`,n/lines.length);const result:any=await blobUrl<any>(line,async url=>await (pipe as any)(url,{max_new_tokens:128}));const x=generatedText(result);if(x)text.push(x)}
   return text.join('\n').trim();
 }
 
