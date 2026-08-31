@@ -1,7 +1,10 @@
 import {useMemo,useRef,useState} from 'react';
-import {BarChart3,BookOpen,CalendarDays,CheckCircle2,FileText,GraduationCap,LoaderCircle,Plus,Save,Sparkles,Trash2,Upload} from 'lucide-react';
+import {BarChart3,BookOpen,CalendarDays,CheckCircle2,FileQuestion,FileText,Flame,GraduationCap,LoaderCircle,Plus,Presentation,Save,Sparkles,Trash2,Upload} from 'lucide-react';
 import {type AppState,LocalRepository,parseFile} from './lib';
 import {analyzeSyllabus} from './academic-ai';
+import SeminarStudio from './SeminarStudio';
+import ExamDNAStudio from './ExamDNAStudio';
+import SmartFeed from './SmartFeed';
 import './academic-hub.css';
 
 type Props={state:AppState;notify:(message:string)=>void};
@@ -14,8 +17,8 @@ function loadPlans():GradePlans{try{return JSON.parse(localStorage.getItem(GRADE
 function savePlans(v:GradePlans){localStorage.setItem(GRADE_KEY,JSON.stringify(v))}
 
 export default function AcademicHub({state,notify}:Props){
- const [tab,setTab]=useState<'syllabus'|'grades'>('syllabus');
- return <section><div className="academic-head"><div><span className="eyebrow">ACADEMIC OS</span><h1>مركز الفصل الدراسي</h1><p>من السيلابس والدرجات إلى المواعيد — بدون إدخال يدوي ممل.</p></div><GraduationCap/></div><div className="tabs academic-tabs"><button className={tab==='syllabus'?'active':''} onClick={()=>setTab('syllabus')}><FileText/> سيلابس ذكي</button><button className={tab==='grades'?'active':''} onClick={()=>setTab('grades')}><BarChart3/> الدرجات والهدف</button></div>{tab==='syllabus'?<SyllabusMagic state={state} notify={notify}/>:<GradePlanner state={state} notify={notify}/>}</section>
+ const [tab,setTab]=useState<'syllabus'|'grades'|'seminar'|'exam'|'feed'>('syllabus');
+ return <section><div className="academic-head"><div><span className="eyebrow">ACADEMIC OS</span><h1>مركز الفصل الدراسي</h1><p>من السيلابس والدرجات إلى المواعيد — بدون إدخال يدوي ممل.</p></div><GraduationCap/></div><div className="tabs academic-tabs"><button className={tab==='syllabus'?'active':''} onClick={()=>setTab('syllabus')}><FileText/> سيلابس ذكي</button><button className={tab==='grades'?'active':''} onClick={()=>setTab('grades')}><BarChart3/> الدرجات والهدف</button><button className={tab==='seminar'?'active':''} onClick={()=>setTab('seminar')}><Presentation/> سيمنار</button><button className={tab==='exam'?'active':''} onClick={()=>setTab('exam')}><FileQuestion/> بصمة الامتحان</button><button className={tab==='feed'?'active':''} onClick={()=>setTab('feed')}><Flame/> Smart Feed</button></div>{tab==='syllabus'&&<SyllabusMagic state={state} notify={notify}/>} {tab==='grades'&&<GradePlanner state={state} notify={notify}/>} {tab==='seminar'&&<SeminarStudio state={state} notify={notify}/>} {tab==='exam'&&<ExamDNAStudio state={state} notify={notify}/>} {tab==='feed'&&<SmartFeed state={state} notify={notify}/>}</section>
 }
 
 function SyllabusMagic({state,notify}:Props){const input=useRef<HTMLInputElement>(null);const [busy,setBusy]=useState(false);const [file,setFile]=useState<File|null>(null);const [data,setData]=useState<any>(null);async function run(f:File){setFile(f);setBusy(true);setData(null);try{const parsed=await parseFile(f);if(!parsed.text.trim())throw new Error(parsed.error||'السيلابس ما بي نص قابل للقراءة.');const d=await analyzeSyllabus(parsed.text);setData(d);notify('حللت السيلابس ورتبت المطلوبات')}catch(e){notify((e as Error).message)}finally{setBusy(false)}}function apply(){if(!data)return;let course=state.courses.find(c=>c.name.trim().toLowerCase()===String(data.courseName||'').trim().toLowerCase());if(!course)course=repo.addCourse(String(data.courseName||file?.name.replace(/\.[^.]+$/,'')||'مادة جديدة'));for(const d of data.deadlines||[]){if(!d.dueAt)continue;const exists=repo.state.deadlines.some(x=>x.courseId===course!.id&&x.title===d.title&&x.dueAt===d.dueAt);if(!exists)repo.state.deadlines.push({id:uid(),courseId:course.id,title:d.title||'موعد أكاديمي',kind:['exam','assignment','presentation','other'].includes(d.kind)?d.kind:'other',dueAt:d.dueAt,done:false})}repo.addArtifact({courseId:course.id,type:'syllabus',title:`سيلابس — ${course.name}`,truth:'supported',data});repo.persist();const plans=loadPlans();if((data.grading||[]).length&&!plans[course.id]){plans[course.id]={target:70,items:(data.grading||[]).map((g:any)=>({id:uid(),name:g.name||'تقييم',weight:Number(g.weight)||0,score:''}))};savePlans(plans)}notify('أضفت المادة والمواعيد وتوزيع الدرجات إلى ScholarMCP')}
