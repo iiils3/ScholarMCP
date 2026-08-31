@@ -1,7 +1,9 @@
 import fs from 'node:fs';
-const path='src/ScholarApp.tsx';
-let s=fs.readFileSync(path,'utf8');
+import path from 'node:path';
+
 let changed=0;
+const appPath='src/ScholarApp.tsx';
+let app=fs.readFileSync(appPath,'utf8');
 const replacements=[
   ['Scholar Core • داخل المنصة','AI محلي • على جهازك'],
   ['القراءة الثقيلة والـOCR تتم سحابيًا حتى ما نرهق جهازك.','الـOCR وقراءة الصور تتم محليًا داخل المتصفح؛ أول تشغيل قد ينزّل نموذج القراءة مرة واحدة.'],
@@ -14,5 +16,14 @@ const replacements=[
   ['Lecture AI: تفريغ التسجيلات على السحابة','Lecture AI: Whisper محلي لتفريغ التسجيلات داخل جهازك'],
   ['GitHub: كود وبناء ونشر الواجهة','GitHub: المستودع والبناء ونشر واجهة ScholarMCP']
 ];
-for(const [from,to] of replacements){if(s.includes(from)){s=s.replaceAll(from,to);changed++}}
-if(changed){fs.writeFileSync(path,s);console.log(`ScholarMCP local-engine UI patch applied (${changed} replacements).`)}else console.log('ScholarMCP UI already reflects local engines.');
+for(const [from,to] of replacements){if(app.includes(from)){app=app.replaceAll(from,to);changed++}}
+fs.writeFileSync(appPath,app);
+
+function walk(dir){return fs.readdirSync(dir,{withFileTypes:true}).flatMap(entry=>entry.isDirectory()?walk(path.join(dir,entry.name)):[path.join(dir,entry.name)])}
+for(const file of walk('src').filter(p=>/\.(ts|tsx|js|jsx)$/.test(p)&&!p.endsWith('scholar-engine.ts')&&!p.endsWith('puter.ts'))){
+  const before=fs.readFileSync(file,'utf8');
+  const after=before.replaceAll("'./puter'","'./scholar-engine'").replaceAll('"./puter"','"./scholar-engine"');
+  if(after!==before){fs.writeFileSync(file,after);changed++}
+}
+if(fs.existsSync('src/puter.ts')){fs.unlinkSync('src/puter.ts');changed++}
+console.log(`ScholarMCP source migration complete (${changed} changes).`);
