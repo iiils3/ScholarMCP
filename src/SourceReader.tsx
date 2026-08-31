@@ -3,6 +3,7 @@ import { ChevronLeft,ChevronRight,FileText,LoaderCircle,Search,ZoomIn,ZoomOut,X,
 import type { Material } from './lib';
 import { getSourceBlob } from './blob-store';
 import { saveMaterialText } from './material-text';
+import './reader-edit.css';
 
 function pageText(text:string,page:number){const re=new RegExp(`\\[\\[PAGE\\s+${page}\\]\\]([\\s\\S]*?)(?=\\[\\[PAGE\\s+\\d+\\]\\]|$)`,'i');return(text.match(re)?.[1]||'').trim()}
 function replacePageText(text:string,page:number,value:string){const marker=`[[PAGE ${page}]]`;const re=new RegExp(`(\\[\\[PAGE\\s+${page}\\]\\])([\\s\\S]*?)(?=\\[\\[PAGE\\s+\\d+\\]\\]|$)`,'i');if(re.test(text))return text.replace(re,`$1\n${value.trim()}\n\n`);return `${text.trim()}\n\n${marker}\n${value.trim()}`}
