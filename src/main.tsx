@@ -17,4 +17,11 @@ function fatal(error:unknown){const message=error instanceof Error?`${error.name
 class ErrorBoundary extends React.Component<React.PropsWithChildren,{error:Error|null}>{state={error:null as Error|null};static getDerivedStateFromError(error:Error){return{error}}componentDidCatch(error:Error){console.error('ScholarMCP render error',error)}render(){if(this.state.error){queueMicrotask(()=>fatal(this.state.error));return null}return this.props.children}}
 window.addEventListener('unhandledrejection',event=>console.error('ScholarMCP unhandled rejection',event.reason));
 
+if('serviceWorker'in navigator&&import.meta.env.PROD){
+  window.addEventListener('load',()=>{
+    const base=import.meta.env.BASE_URL||'/';
+    navigator.serviceWorker.register(`${base}sw.js`,{scope:base}).catch(error=>console.warn('ScholarMCP offline shell unavailable',error));
+  });
+}
+
 import('./ScholarApp').then(({default:App})=>ReactDOM.createRoot(rootEl).render(<React.StrictMode><ErrorBoundary><App/></ErrorBoundary></React.StrictMode>)).catch(fatal);
