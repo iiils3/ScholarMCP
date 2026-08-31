@@ -22,6 +22,8 @@ export function weakest(state:AppState,courseId?:string){return state.topics.fil
 const EMPTY:AppState={profile:{name:'',studyLanguage:'ar',onboarded:false},courses:[],materials:[],topics:[],flashcards:[],deadlines:[],artifacts:[],assignments:[]};
 const LOCAL_KEY='scholarmcp.github.v1';
 function cloneState<T>(value:T):T{try{return structuredClone(value)}catch{return JSON.parse(JSON.stringify(value)) as T}}
+const banned=(v?:string)=>/^(source|page|pdf|docx?|pptx?|file)$/i.test((v||'').trim());
+
 export class LocalRepository{
   state:AppState;
   constructor(){try{this.state={...cloneState(EMPTY),...JSON.parse(localStorage.getItem(LOCAL_KEY)||'{}')} as AppState}catch{this.state=cloneState(EMPTY)}}
@@ -32,10 +34,10 @@ export class LocalRepository{
   deleteCourse(id:string){this.state.courses=this.state.courses.filter(c=>c.id!==id);this.state.materials=this.state.materials.filter(x=>x.courseId!==id);this.state.topics=this.state.topics.filter(x=>x.courseId!==id);this.state.flashcards=this.state.flashcards.filter(x=>x.courseId!==id);this.state.deadlines=this.state.deadlines.filter(x=>x.courseId!==id);this.state.artifacts=this.state.artifacts.filter(x=>x.courseId!==id);this.state.assignments=this.state.assignments.filter(x=>x.courseId!==id);this.persist()}
   addMaterial(m:Omit<Material,'id'|'createdAt'>){const x={...m,id:uid(),createdAt:todayIso()};this.state.materials.unshift(x);this.persist();return x}
   deleteMaterial(id:string){this.state.materials=this.state.materials.filter(x=>x.id!==id);this.persist()}
-  upsertTopics(courseId:string,items:Array<{title:string;sourceRef?:string}>){for(const i of items){const title=i.title?.trim();if(!title||/^(source|page|pdf|docx?|pptx?|file)$/i.test(title)||this.state.topics.some(t=>t.courseId===courseId&&t.title===title))continue;this.state.topics.push({id:uid(),courseId,title,mastery:0,attempts:0,correct:0,incorrect:0,sourceRef:i.sourceRef})}this.persist()}
-  recordTopic(courseId:string,title:string|undefined,correct:boolean){if(!title||/^(source|page|pdf|docx?|pptx?|file)$/i.test(title))return;let t=this.state.topics.find(x=>x.courseId===courseId&&x.title===title);if(!t){t={id:uid(),courseId,title,mastery:0,attempts:0,correct:0,incorrect:0};this.state.topics.push(t)}t.attempts++;correct?t.correct++:t.incorrect++;t.mastery=Math.min(100,Math.max(0,Math.round((t.correct/t.attempts)*100*(1-Math.exp(-t.attempts/3))+(correct?4:0))));this.persist()}
+  upsertTopics(courseId:string,items:Array<{title:string;sourceRef?:string}>){for(const i of items){const title=i.title?.trim();if(!title||banned(title)||this.state.topics.some(t=>t.courseId===courseId&&t.title===title))continue;this.state.topics.push({id:uid(),courseId,title,mastery:0,attempts:0,correct:0,incorrect:0,sourceRef:i.sourceRef})}this.persist()}
+  recordTopic(courseId:string,title:string|undefined,correct:boolean){if(!title||banned(title))return;let t=this.state.topics.find(x=>x.courseId===courseId&&x.title===title);if(!t){t={id:uid(),courseId,title,mastery:0,attempts:0,correct:0,incorrect:0};this.state.topics.push(t)}t.attempts++;correct?t.correct++:t.incorrect++;t.mastery=Math.min(100,Math.max(0,Math.round((t.correct/t.attempts)*100*(1-Math.exp(-t.attempts/3))+(correct?4:0))));this.persist()}
   addArtifact(a:Omit<Artifact,'id'|'createdAt'>){const x={...a,id:uid(),createdAt:todayIso()};this.state.artifacts.unshift(x);this.persist();return x}
-  addFlashcards(courseId:string,cards:Array<{front:string;back:string;topic?:string;sourceRef?:string}>){const made=cards.filter(c=>c.front&&c.back&&!/\b(source|page|pdf|docx?|pptx?)\b/i.test(c.front)).map(c=>({...c,id:uid(),courseId,dueAt:todayIso(),interval:0}));this.state.flashcards.unshift(...made);this.persist();return made}
+  addFlashcards(courseId:string,cards:Array<{front:string;back:string;topic?:string;sourceRef?:string}>){const made=cards.filter(c=>c.front&&c.back&&!banned(c.topic)&&!/\b(source|page|pdf|docx?|pptx?)\b/i.test(c.front)).map(c=>({...c,id:uid(),courseId,dueAt:todayIso(),interval:0}));this.state.flashcards.unshift(...made);this.persist();return made}
   reviewCard(id:string,good:boolean){const c=this.state.flashcards.find(x=>x.id===id);if(!c)return;c.interval=good?(c.interval?Math.min(60,Math.round(c.interval*2.2)):1):0;c.dueAt=new Date(Date.now()+Math.max(.25,c.interval)*86400000).toISOString();this.persist()}
   addAssignment(a:Omit<Assignment,'id'|'createdAt'>){const x={...a,id:uid(),createdAt:todayIso()};this.state.assignments.unshift(x);if(a.dueAt)this.state.deadlines.push({id:uid(),courseId:a.courseId,title:a.title,kind:'assignment',dueAt:a.dueAt,done:false});this.persist();return x}
 }
@@ -48,21 +50,49 @@ export function retrieve(materials:Material[],query:string,limit=8){const terms=
 function cleanAcademic(context:string){return context.replace(/^SOURCE[^\n]*$/gmi,' ').replace(/\[\[PAGE\s+\d+\]\]/gi,' ').replace(/\b(source|page|pdf|docx?|pptx?|file)\b/gi,' ').replace(/\s+/g,' ').trim()}
 function sentences(context:string){return cleanAcademic(context).split(/(?<=[.!?؟])\s+|\n+/).map(x=>x.trim()).filter(x=>x.length>35)}
 function keywords(context:string,limit=20){const stop=new Set('هذا هذه ذلك التي الذي من إلى في على عن مع ثم أو و هو هي تم يتم كما كان تكون يكون بين عند بعد قبل خلال ضمن حيث اذا إذا ما لا كل قد an the and of to in for on is are was were this that with from by as or source page pdf doc docx ppt pptx file'.split(/\s+/));const words=(cleanAcademic(context).match(/[\p{L}\p{N}][\p{L}\p{N}_-]{2,}/gu)||[]).map(x=>x.toLowerCase()).filter(x=>!stop.has(x)&&!/^\d+$/.test(x));const counts=new Map<string,number>();for(const w of words)counts.set(w,(counts.get(w)||0)+1);return [...counts.entries()].sort((a,b)=>b[1]-a[1]).slice(0,limit).map(x=>x[0])}
-function ref(context:string,text:string){const i=context.indexOf(text);const ms=[...context.slice(0,Math.max(0,i)).matchAll(/\[\[PAGE (\d+)\]\]/g)];return `ص ${ms.length?ms[ms.length-1][1]:1}`}
+function pageRef(context:string,text:string){const i=context.indexOf(text);const ms=[...context.slice(0,Math.max(0,i)).matchAll(/\[\[PAGE (\d+)\]\]/g)];return `ص ${ms.length?ms[ms.length-1][1]:1}`}
 
-async function localFallback(action:string,payload:any){const context=String(payload?.context||'').slice(0,120000);const ss=sentences(context);const ks=keywords(context);const top=ss.slice(0,Math.min(18,ss.length));
- if(action==='chat'){const terms=String(payload?.question||'').toLowerCase().split(/\s+/).filter((x:string)=>x.length>2);const hits=ss.map(text=>({text,score:terms.reduce((n:number,t:string)=>n+(text.toLowerCase().includes(t)?1:0),0)})).filter(x=>x.score>0).sort((a,b)=>b.score-a.score).slice(0,4);return {text:hits.length?hits.map(x=>`${x.text} (${ref(context,x.text)})`).join('\n\n'):'غير موجود في المصدر بصيغة واضحة.',truth:hits.length?'supported':'unverified'}}
- if(action==='summary')return {summary:top.join('\n\n'),keyConcepts:ks.slice(0,10).map(k=>({title:k,definition:ss.find(s=>s.toLowerCase().includes(k))?.slice(0,260)||'',sourceRef:ref(context,ss.find(s=>s.toLowerCase().includes(k))||'')})),estimatedCoverage:Math.min(85,Math.max(35,Math.round(top.join(' ').length/Math.max(1,cleanAcademic(context).length)*400))),omitted:['هذه نتيجة محلية احتياطية؛ فعّل اتصال AI لملخص أدق.'],examRisk:ks.slice(0,5)};
- if(action==='flashcards')return {cards:ks.slice(0,Math.min(Number(payload?.count)||10,12)).map((k,i)=>{const s=ss.find(x=>x.toLowerCase().includes(k))||top[i%Math.max(1,top.length)]||k;return {front:`اشرح ${k} حسب المادة.`,back:s.slice(0,300),topic:k,sourceRef:ref(context,s)}})};
- if(action==='quiz'){const pool=ks.slice(0,16);return {questions:pool.slice(0,Math.min(Number(payload?.count)||6,8)).map((term,i)=>{const s=ss.find(x=>x.toLowerCase().includes(term))||top[i%Math.max(1,top.length)]||term;const distractors=pool.filter(x=>x!==term).slice(i%Math.max(1,pool.length-1)).concat(pool).filter(x=>x!==term).slice(0,3);const answerIndex=i%4;const choices=[...distractors];choices.splice(answerIndex,0,term);return {question:`أي مصطلح من الخيارات يرتبط مباشرة بهذه العبارة؟\n${s.slice(0,220)}`,choices,answerIndex,explanation:`المصطلح «${term}» ورد ضمن سياق العبارة في المصدر.`,sourceRef:ref(context,s),topic:term}})};
- if(action==='mindmap')return {nodes:[{id:'root',label:ks[0]||'المادة',definition:top[0]||'',sourceRef:'ص 1',parent:null},...ks.slice(1,12).map((k,i)=>({id:`n${i+1}`,label:k,definition:ss.find(s=>s.toLowerCase().includes(k))?.slice(0,180)||'',sourceRef:ref(context,ss.find(s=>s.toLowerCase().includes(k))||''),parent:'root'}))]};
- if(action==='study')return {steps:top.slice(0,5).map((s,i)=>({title:['الفكرة الأساسية','شرح مركز','ربط المفاهيم','استرجاع نشط','تثبيت'][i]||`خطوة ${i+1}`,detail:s}))};
- if(action==='translate')return {text:'تعذر تشغيل مترجم AI. اتصل بالإنترنت وحاول مرة ثانية.',glossary:[]};
- if(action==='assignment'){const req=String(payload?.instructions||'').split(/\n|[.;]/).map((x:string)=>x.trim()).filter((x:string)=>x.length>10).slice(0,8);return {checklist:req.map((text:string)=>({text,required:true})),outline:ks.slice(0,6).map((k,i)=>`${i+1}. ${k}`).join('\n'),draft:top.slice(0,8).join('\n\n'),assessment:{criteria:[],missing:['تقييم AI غير متاح حالياً.']}}}
- if(action==='package')return {title:String(payload?.topic||'ScholarMCP Academic Package'),summary:top.slice(0,6).join('\n\n'),outline:ks.slice(0,8),slides:ks.slice(0,8).map((k,i)=>({title:k,bullets:(ss.filter(s=>s.toLowerCase().includes(k)).slice(0,3).length?ss.filter(s=>s.toLowerCase().includes(k)).slice(0,3):top.slice(i,i+2)).map(s=>s.slice(0,170)),notes:`راجع المصدر حول ${k}.`})),references:['المصادر المرفوعة داخل المادة']};
- return {text:'المعالجة المحلية الاحتياطية.'}}
+async function localFallback(action:string,payload:any){
+  const context=String(payload?.context||'').slice(0,120000);
+  const ss=sentences(context), ks=keywords(context), top=ss.slice(0,18);
+  if(action==='chat'){
+    const terms=String(payload?.question||'').toLowerCase().split(/\s+/).filter((x:string)=>x.length>2);
+    const hits=ss.map(text=>({text,score:terms.reduce((n:number,t:string)=>n+(text.toLowerCase().includes(t)?1:0),0)})).filter(x=>x.score>0).sort((a,b)=>b.score-a.score).slice(0,4);
+    return {text:hits.length?hits.map(x=>`${x.text} (${pageRef(context,x.text)})`).join('\n\n'):'غير موجود في المصدر بصيغة واضحة.',truth:hits.length?'supported':'unverified'};
+  }
+  if(action==='summary'){
+    return {summary:top.join('\n\n'),keyConcepts:ks.slice(0,10).map(k=>{const s=ss.find(x=>x.toLowerCase().includes(k))||'';return {title:k,definition:s.slice(0,260),sourceRef:pageRef(context,s)}}),estimatedCoverage:Math.min(85,Math.max(35,Math.round(top.join(' ').length/Math.max(1,cleanAcademic(context).length)*400))),omitted:['هذه نتيجة محلية احتياطية؛ فعّل اتصال AI لملخص أدق.'],examRisk:ks.slice(0,5)};
+  }
+  if(action==='flashcards'){
+    return {cards:ks.slice(0,Math.min(Number(payload?.count)||10,12)).map((k,i)=>{const s=ss.find(x=>x.toLowerCase().includes(k))||top[i%Math.max(1,top.length)]||k;return {front:`اشرح ${k} حسب المادة.`,back:s.slice(0,300),topic:k,sourceRef:pageRef(context,s)}})};
+  }
+  if(action==='quiz'){
+    const pool=ks.slice(0,16);
+    const questions=pool.slice(0,Math.min(Number(payload?.count)||6,8)).map((term,i)=>{
+      const s=ss.find(x=>x.toLowerCase().includes(term))||top[i%Math.max(1,top.length)]||term;
+      const distractors=pool.filter(x=>x!==term).slice(i+1).concat(pool).filter(x=>x!==term).slice(0,3);
+      const answerIndex=i%4;const choices=[...distractors];while(choices.length<3)choices.push(`خيار ${choices.length+1}`);choices.splice(answerIndex,0,term);
+      return {question:`أي مصطلح يرتبط مباشرة بهذه العبارة؟\n${s.slice(0,220)}`,choices,answerIndex,explanation:`المصطلح «${term}» ورد ضمن سياق العبارة في المصدر.`,sourceRef:pageRef(context,s),topic:term};
+    });
+    return {questions};
+  }
+  if(action==='mindmap'){
+    return {nodes:[{id:'root',label:ks[0]||'المادة',definition:top[0]||'',sourceRef:'ص 1',parent:null},...ks.slice(1,12).map((k,i)=>{const s=ss.find(x=>x.toLowerCase().includes(k))||'';return {id:`n${i+1}`,label:k,definition:s.slice(0,180),sourceRef:pageRef(context,s),parent:'root'}})]};
+  }
+  if(action==='study') return {steps:top.slice(0,5).map((s,i)=>({title:['الفكرة الأساسية','شرح مركز','ربط المفاهيم','استرجاع نشط','تثبيت'][i]||`خطوة ${i+1}`,detail:s}))};
+  if(action==='translate') return {text:'تعذر تشغيل مترجم AI. اتصل بالإنترنت وحاول مرة ثانية.',glossary:[]};
+  if(action==='assignment'){
+    const req=String(payload?.instructions||'').split(/\n|[.;]/).map((x:string)=>x.trim()).filter((x:string)=>x.length>10).slice(0,8);
+    return {checklist:req.map((text:string)=>({text,required:true})),outline:ks.slice(0,6).map((k,i)=>`${i+1}. ${k}`).join('\n'),draft:top.slice(0,8).join('\n\n'),assessment:{criteria:[],missing:['تقييم AI غير متاح حالياً.']}};
+  }
+  if(action==='package') return {title:String(payload?.topic||'ScholarMCP Academic Package'),summary:top.slice(0,6).join('\n\n'),outline:ks.slice(0,8),slides:ks.slice(0,8).map((k,i)=>({title:k,bullets:(ss.filter(s=>s.toLowerCase().includes(k)).slice(0,3).length?ss.filter(s=>s.toLowerCase().includes(k)).slice(0,3):top.slice(i,i+2)).map(s=>s.slice(0,170)),notes:`راجع المصدر حول ${k}.`})),references:['المصادر المرفوعة داخل المادة']};
+  return {text:'المعالجة المحلية الاحتياطية.'};
+}
 
-export async function aiTask(action:string,payload:any){try{return await (await import('./puter')).smartTask(action,payload)}catch(e){console.warn('ScholarMCP AI fallback:',e);return localFallback(action,payload)}}
+export async function aiTask(action:string,payload:any){
+  try{return await (await import('./puter')).smartTask(action,payload)}
+  catch(e){console.warn('ScholarMCP AI fallback:',e);return localFallback(action,payload)}
+}
 
 export async function researchCrossref(q:string){const r=await fetch(`https://api.crossref.org/works?query.bibliographic=${encodeURIComponent(q)}&rows=10&select=DOI,title,author,issued,container-title,URL,type`);if(!r.ok)throw new Error('تعذر الاتصال بـ Crossref');const j=await r.json();return (j.message?.items||[]).map((p:any)=>{const title=p.title?.[0]||'';const authors=(p.author||[]).map((a:any)=>[a.given,a.family].filter(Boolean).join(' '));const year=p.issued?.['date-parts']?.[0]?.[0]||null;const journal=p['container-title']?.[0]||'';const doi=p.DOI||'';return {title,authors,year,journal,doi,url:doi?`https://doi.org/${doi}`:p.URL,citation:`${authors.join(', ')} (${year||'n.d.'}). ${title}. ${journal}${doi?`. https://doi.org/${doi}`:''}`}}).filter((x:any)=>x.title)}
 export function youtubeUrl(q:string){return `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`}
