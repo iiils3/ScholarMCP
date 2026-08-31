@@ -60,7 +60,7 @@ function taskPrompt(action:string,payload:any){
   if(action==='quiz')return `${rules}\nأنشئ ${Math.max(5,Math.min(30,Number(payload?.count)||10))} أسئلة امتحانية متنوعة من المصدر. الخيارات الأربعة يجب أن تكون معقولة، لا تجعل الصحيح مكشوفاً بالطول أو الصياغة.\nأعد {"questions":[{"question":"...","choices":["...","...","...","..."],"answerIndex":0,"explanation":"...","sourceRef":"ص N","topic":"...","difficulty":"easy|medium|hard"}]}.\nSOURCE_CONTEXT:\n${ctx}`;
   if(action==='mindmap')return `${rules}\nاستخرج خريطة مفاهيم هرمية حقيقية من المادة.\nأعد {"nodes":[{"id":"root","label":"...","definition":"...","sourceRef":"ص N","parent":null},{"id":"n1","label":"...","definition":"...","sourceRef":"ص N","parent":"root"}]}.\nSOURCE_CONTEXT:\n${ctx}`;
   if(action==='study')return `${rules}\nابنِ جلسة تعلم تفاعلية قصيرة، تبدأ بالفهم ثم الاسترجاع ثم التثبيت، ولا تكتف بملخص.\nأعد {"steps":[{"title":"...","detail":"...","sourceRef":"ص N","prompt":"سؤال استرجاع اختياري"}]}.\nSOURCE_CONTEXT:\n${ctx}`;
-  if(action==='translate')return `${rules}\nترجم المادة إلى ${String(payload?.target||'العربية')} مع الحفاظ على المصطلح العلمي وعدم حذف أي معلومة.\nأعد {"text":"...","glossary":[{"term":"...","translation":"..."}]}.\nSOURCE_CONTEXT:\n${ctx}`;
+  if(action==='translate')return `${rules}\nترجم النص التالي بالكامل إلى ${String(payload?.target||'العربية')}. ممنوع الحذف أو التلخيص. احتفظ بأرقام الصفحات الظاهرة، وبالمصطلح العلمي الأصلي بين قوسين عندما تمنع ترجمته الغموض.\nأعد {"text":"...","glossary":[{"term":"...","translation":"..."}]}.\nSOURCE_CONTEXT:\n${ctx}`;
   if(action==='assignment')return `${rules}\nساعد الطالب على بناء العمل الأكاديمي من المصدر والتعليمات من دون اختلاق مراجع.\nINSTRUCTIONS: ${String(payload?.instructions||'')}\nRUBRIC: ${String(payload?.rubric||'')}\nأعد {"checklist":[{"text":"...","required":true}],"outline":"...","draft":"...","assessment":{"criteria":[{"name":"...","status":"ok|weak|missing","feedback":"..."}],"missing":[]}}.\nSOURCE_CONTEXT:\n${ctx}`;
   if(action==='package')return `${rules}\nحوّل المصدر إلى حزمة سيمنار/عرض أكاديمي قابلة للتعديل.\nأعد {"title":"...","summary":"...","outline":["..."],"slides":[{"title":"...","bullets":["..."],"notes":"..."}],"references":["..."]}. يجب أن تكون الشرائح مختصرة لكن Speaker Notes مفيدة.\nSOURCE_CONTEXT:\n${ctx}`;
   return `${rules}\nACTION: ${action}\nPAYLOAD: ${JSON.stringify({...payload,context:ctx})}`;
@@ -79,7 +79,35 @@ async function callChat(prompt:string){
   return responseText(result);
 }
 
+function translationChunks(raw:string,max=24000){
+  const pageParts=raw.split(/(?=\[\[PAGE\s+\d+\]\])/g).filter(Boolean);
+  const out:string[]=[];let current='';
+  for(const part of pageParts){
+    if(part.length>max){
+      if(current.trim()){out.push(current);current=''}
+      for(let i=0;i<part.length;i+=max)out.push(part.slice(i,i+max));
+      continue;
+    }
+    if(current&&current.length+part.length>max){out.push(current);current=part}else current+=part;
+  }
+  if(current.trim())out.push(current);
+  return out.length?out:[raw];
+}
+async function translateLong(payload:any){
+  const raw=String(payload?.context||'');const parts=translationChunks(raw);const texts:string[]=[];const glossary=new Map<string,string>();
+  for(let i=0;i<parts.length;i++){
+    lastStatus={stage:'translate',progress:Math.round((i/parts.length)*100),message:`ترجمة الجزء ${i+1} من ${parts.length}`};
+    const text=await callChat(taskPrompt('translate',{...payload,context:parts[i]}));
+    if(!text)throw new Error(`تعذرت ترجمة الجزء ${i+1}.`);
+    const data=parseJSON(text);texts.push(String(data.text||''));
+    for(const g of data.glossary||[]){const term=String(g.term||'').trim();if(term&&!glossary.has(term))glossary.set(term,String(g.translation||''))}
+  }
+  lastStatus={stage:'translate',progress:100,message:'اكتملت ترجمة الملف بالكامل'};
+  return {text:texts.join('\n\n'),glossary:[...glossary.entries()].map(([term,translation])=>({term,translation})),parts:parts.length,complete:true};
+}
+
 export async function smartTask(action:string,payload:any){
+  if(action==='translate'&&String(payload?.context||'').length>70000)return translateLong(payload);
   const prompt=taskPrompt(action,payload);
   const text=await callChat(prompt);
   if(!text)throw new Error('لم يرجع Scholar AI نتيجة قابلة للقراءة.');
