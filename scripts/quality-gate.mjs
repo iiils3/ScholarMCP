@@ -23,11 +23,15 @@ const video=exists('src/StudyVideoStudio.tsx')?read('src/StudyVideoStudio.tsx'):
 const bag=exists('src/academic-bag.ts')?read('src/academic-bag.ts'):'';
 
 check(!/puter\.com|js\.puter|window\.puter|appdeploy\.ai|scholarmcp-core/i.test(index+srcText),'External AI runtime/login dependency is still present');
+check(!/Scholar Core|معالجة سحابية|على السحابة|تتم سحابيًا|CLOUD-FIRST/i.test(app+lecture+academic),'Stale cloud-runtime claims are still visible in the product UI');
+check(app.includes('AI محلي • على جهازك'),'Topbar does not disclose the local engine truth');
+check(app.includes('Qwen محلي')&&app.includes('Granite + TrOCR')&&app.includes('Whisper محلي'),'Settings do not describe the real local engines');
 check(bridge.includes("from './local-ai'")&&bridge.includes("from './local-ocr'")&&bridge.includes("from './local-speech'"),'Scholar engine bridge is not fully local');
 check(localAI.includes('Qwen3-0.6B-ONNX')&&localAI.includes("import('@huggingface/transformers')"),'Local Qwen engine is missing');
 check(localAI.includes("case'custom'")&&localAI.includes('customTask'),'Generic academic local task path is missing');
 check(localOCR.includes('granite-docling-258M-ONNX')&&localOCR.includes('trocr-small-handwritten'),'Local document/handwriting OCR is incomplete');
 check(localSpeech.includes('whisper-tiny')&&localSpeech.includes('automatic-speech-recognition'),'Local lecture transcription engine is missing');
+check(bridge.includes('fallbackCustom'),'No-dead-button academic fallback is missing');
 check(bridge.includes('speechSynthesis'),'In-platform text-to-speech is missing');
 check(parser.includes("ext==='pdf'")&&parser.includes('ocrSource'),'PDF + OCR ingestion path missing');
 check(app.includes("view==='today'"),'Today route missing');
@@ -61,4 +65,4 @@ check(video.includes('customTask')&&video.includes('MediaRecorder')&&video.inclu
 check(bag.includes('JSZip')&&bag.includes('flashcards.tsv')&&bag.includes('manifest.json'),'Full academic bag export is incomplete');
 
 if(failures.length){console.error('\nScholarMCP quality gate FAILED:\n- '+failures.join('\n- '));process.exit(1)}
-console.log('ScholarMCP quality gate passed: repository-local Qwen, OCR, Whisper, Course Brain, long lectures, Academic Project, AI video, academic bag, seminar, Exam DNA, Smart Feed and Scholar Day are wired with no external AI login/runtime.');
+console.log('ScholarMCP quality gate passed: repository-local Qwen, OCR, Whisper, local fallback, Course Brain, long lectures, Academic Project, AI video, academic bag, seminar, Exam DNA, Smart Feed and Scholar Day are wired with truthful local-engine UI and no external AI login/runtime.');
