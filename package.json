@@ -10,7 +10,6 @@
     "typecheck": "tsc -b --pretty false"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.57.4",
     "docx": "^9.5.1",
     "jszip": "^3.10.1",
     "lucide-react": "^0.544.0",
