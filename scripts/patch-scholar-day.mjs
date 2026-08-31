@@ -7,3 +7,4 @@ must("<p>نبدأ بما يرفع درجتك، مو بما يملأ وقتك.</p
 if(process.exitCode)process.exit(process.exitCode);
 fs.writeFileSync(path,s);
 console.log('Scholar Day wired into Today.');
+// trigger after workflow installation
