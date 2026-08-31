@@ -35,6 +35,14 @@ jobs:
       - name: Product quality gate
         run: npm run qa
 
+      - name: Scholar Core health
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error \
+            -H 'Origin: https://iiils3.github.io' \
+            https://scholarmcp-core-75hnna.v2.appdeploy.ai/api/_healthcheck \
+            | grep -q '"ok":true'
+
       - name: Typecheck
         run: npm run typecheck
 
