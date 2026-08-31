@@ -1,0 +1,26 @@
+name: Academic Hub feature wiring
+on:
+  push:
+    paths:
+      - scripts/patch-academic-hub.mjs
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/patch-academic-hub.mjs
+      - name: Commit patch if needed
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name "ScholarMCP Builder"
+          git config user.email "actions@users.noreply.github.com"
+          git add src/AcademicHub.tsx
+          git commit -m "feat(academic): wire seminar, exam DNA and smart feed"
+          git push
