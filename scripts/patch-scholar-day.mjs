@@ -17,6 +17,13 @@ const replacements=[
   ['GitHub: كود وبناء ونشر الواجهة','GitHub: المستودع والبناء ونشر واجهة ScholarMCP']
 ];
 for(const [from,to] of replacements){if(app.includes(from)){app=app.replaceAll(from,to);changed++}}
+if(!app.includes("import CourseChatPro from './CourseChatPro';")){
+  const anchor="import MindMapView from './MindMapView';";
+  if(app.includes(anchor)){app=app.replace(anchor,`${anchor}\nimport CourseChatPro from './CourseChatPro';`);changed++}
+}
+const chatStart=app.indexOf('function CourseChat(');
+const modesStart=chatStart>=0?app.indexOf('const modes=',chatStart):-1;
+if(chatStart>=0&&modesStart>chatStart){app=`${app.slice(0,chatStart)}const CourseChat=CourseChatPro;\n\n${app.slice(modesStart)}`;changed++}
 fs.writeFileSync(appPath,app);
 
 function walk(dir){return fs.readdirSync(dir,{withFileTypes:true}).flatMap(entry=>entry.isDirectory()?walk(path.join(dir,entry.name)):[path.join(dir,entry.name)])}
