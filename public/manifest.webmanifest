@@ -1,0 +1,19 @@
+{
+  "name": "ScholarMCP — نظام الطالب الأكاديمي",
+  "short_name": "ScholarMCP",
+  "description": "نظام الطالب الأكاديمي الذكي: دراسة، مراجعة، بحث، محاضرات ومشاريع في مكان واحد.",
+  "lang": "ar",
+  "dir": "rtl",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f5f7fb",
+  "theme_color": "#0f1f3d",
+  "categories": ["education", "productivity"],
+  "shortcuts": [
+    {"name":"الدراسة","short_name":"الدراسة","url":"./"},
+    {"name":"موادي","short_name":"موادي","url":"./"}
+  ]
+}
