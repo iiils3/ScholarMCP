@@ -14,6 +14,9 @@ const seminar=exists('src/SeminarStudio.tsx')?read('src/SeminarStudio.tsx'):'';
 const exam=exists('src/ExamDNAStudio.tsx')?read('src/ExamDNAStudio.tsx'):'';
 const feed=exists('src/SmartFeed.tsx')?read('src/SmartFeed.tsx'):'';
 const day=exists('src/ScholarDay.tsx')?read('src/ScholarDay.tsx'):'';
+const project=exists('src/AcademicProjectStudio.tsx')?read('src/AcademicProjectStudio.tsx'):'';
+const video=exists('src/StudyVideoStudio.tsx')?read('src/StudyVideoStudio.tsx'):'';
+const bag=exists('src/academic-bag.ts')?read('src/academic-bag.ts'):'';
 
 check(!/puter\.com|js\.puter|window\.puter/i.test(index+bridge+academicAI),'Third-party Puter login/runtime is still present');
 check(bridge.includes('scholarmcp-core-75hnna.v2.appdeploy.ai'),'ScholarMCP internal cloud core is missing');
@@ -40,11 +43,18 @@ check(academic.includes('GradePlanner'),'Grade planner missing');
 check(academic.includes('SeminarStudio'),'Seminar Studio missing from Academic Hub');
 check(academic.includes('ExamDNAStudio'),'Exam DNA missing from Academic Hub');
 check(academic.includes('SmartFeed'),'Smart Feed missing from Academic Hub');
+check(academic.includes('AcademicProjectStudio'),'Academic Project Studio missing from Academic Hub');
+check(academic.includes('StudyVideoStudio'),'AI Study Video missing from Academic Hub');
 check(lecture.includes('speechToText')&&lecture.includes('MediaRecorder'),'Lecture record/transcribe path incomplete');
+check(lecture.includes('45_000')&&lecture.includes('recordedParts'),'Long lecture safe segmentation is missing');
 check(seminar.includes('exportPptx')&&seminar.includes('buildSeminarRehearsal'),'Seminar export/rehearsal path incomplete');
 check(exam.includes('analyzeExamDNA'),'Exam DNA analysis path incomplete');
 check(feed.includes('reviewFSRS'),'Smart Feed is not tied to spaced repetition');
 check(day.includes('riskScore')&&day.includes('dueDate'),'Scholar Day is not adaptive to risk/reviews');
+check(project.includes('citationHealth')&&project.includes('unsupportedClaims'),'Academic project citation/claim audit is missing');
+check(project.includes('exportAcademicBag')&&project.includes('exportPptx')&&project.includes('exportDocx'),'Academic project export pipeline is incomplete');
+check(video.includes('customTask')&&video.includes('MediaRecorder')&&video.includes('captureStream'),'In-platform AI study video pipeline is incomplete');
+check(bag.includes('JSZip')&&bag.includes('flashcards.tsv')&&bag.includes('manifest.json'),'Full academic bag export is incomplete');
 
 if(failures.length){console.error('\nScholarMCP quality gate FAILED:\n- '+failures.join('\n- '));process.exit(1)}
-console.log('ScholarMCP quality gate passed: no third-party login flow; internal cloud core, ingestion, Course Brain, lecture, Academic OS, seminar, Exam DNA, Smart Feed and Scholar Day are wired.');
+console.log('ScholarMCP quality gate passed: no third-party login flow; internal core, Course Brain, long lectures, Academic Project, AI video, academic bag, seminar, Exam DNA, Smart Feed and Scholar Day are wired.');
