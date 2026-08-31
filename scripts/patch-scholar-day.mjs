@@ -1,10 +1,18 @@
 import fs from 'node:fs';
 const path='src/ScholarApp.tsx';
 let s=fs.readFileSync(path,'utf8');
-function must(oldText,newText,label){if(!s.includes(oldText)){console.error(`Missing patch target: ${label}`);process.exitCode=1;return}s=s.replace(oldText,newText)}
-must("{art.type==='translation'&&<pre className=\"source-text\">{d.text}</pre>}","{art.type==='translation'&&<div><div className=\"export-inline\" style={{marginBottom:10}}><button className=\"ghost\" onClick={()=>exportDocx(art.title,d.text||'')}><Download/> تنزيل ملف الترجمة Word</button></div><pre className=\"source-text\">{d.text}</pre></div>}",'translation export');
-must("{typeof p.progress==='number'?`${Math.round(p.progress*100)}%`:'أول تشغيل قد يحتاج تنزيل النموذج مرة واحدة'}","{typeof p.progress==='number'?`${Math.round(p.progress*100)}%`:'المعالجة تجري داخل ScholarMCP'}",'engine progress label');
-must("<span className=\"local-pill\"><ShieldCheck/> AI سحابي • المصدر عندك</span>","<span className=\"local-pill\"><ShieldCheck/> Scholar Core • داخل المنصة</span>",'topbar internal core label');
-if(process.exitCode)process.exit(process.exitCode);
-fs.writeFileSync(path,s);
-console.log('ScholarMCP finishing patch applied.');
+let changed=0;
+const replacements=[
+  ['Scholar Core • داخل المنصة','AI محلي • على جهازك'],
+  ['القراءة الثقيلة والـOCR تتم سحابيًا حتى ما نرهق جهازك.','الـOCR وقراءة الصور تتم محليًا داخل المتصفح؛ أول تشغيل قد ينزّل نموذج القراءة مرة واحدة.'],
+  ['Scholar AI يعالج المادة على السحابة…','Scholar AI يعالج المادة على جهازك…'],
+  ['المعالجة تجري داخل ScholarMCP','المعالجة تجري على جهازك داخل ScholarMCP'],
+  ['CLOUD-FIRST','LOCAL-FIRST'],
+  ['المعالجة الثقيلة سحابية، وتقدمك يبقى تحت سيطرتك.','المعالجة الأكاديمية تعمل على جهازك، وتقدمك يبقى تحت سيطرتك.'],
+  ['Scholar AI: معالجة سحابية بدون تنزيل نموذج على الموبايل','Scholar AI: Qwen محلي — أول تشغيل ينزّل النموذج مرة واحدة'],
+  ['OCR: قراءة مطبوع وخط يدوي على السحابة','OCR: Granite + TrOCR محليان للمطبوع والخط اليدوي'],
+  ['Lecture AI: تفريغ التسجيلات على السحابة','Lecture AI: Whisper محلي لتفريغ التسجيلات داخل جهازك'],
+  ['GitHub: كود وبناء ونشر الواجهة','GitHub: المستودع والبناء ونشر واجهة ScholarMCP']
+];
+for(const [from,to] of replacements){if(s.includes(from)){s=s.replaceAll(from,to);changed++}}
+if(changed){fs.writeFileSync(path,s);console.log(`ScholarMCP local-engine UI patch applied (${changed} replacements).`)}else console.log('ScholarMCP UI already reflects local engines.');
