@@ -3,6 +3,7 @@ import { BookOpen,Brain,CalendarDays,CheckCircle2,CircleAlert,Download,FileText,
 import { type AppState,type Course,type Material,type Artifact,type Flashcard,LocalRepository,parseFile,humanSize,fmtDate,daysUntil,courseMastery,riskScore,weakest,retrieve,aiTask,exportDocx,exportPptx } from './lib';
 import SourceReader from './SourceReader';
 import LectureStudio from './LectureStudio';
+import AcademicHub from './AcademicHub';
 import MindMapView from './MindMapView';
 import { putSourceBlob,deleteSourceBlob,requestPersistentStorage,storageEstimate } from './blob-store';
 import { review as reviewFSRS,preview as previewFSRS,dueDate,retrievability,formatInterval,type ScholarRating } from './spaced';
@@ -12,10 +13,10 @@ import { scholarSearch,type ScholarPaper } from './research';
 import { exportFullBackup,restoreFullBackup } from './backup';
 import './scholar.css';
 
-type View='today'|'courses'|'course'|'study'|'assignments'|'research'|'library'|'calendar'|'settings';
+type View='today'|'courses'|'course'|'study'|'assignments'|'academic'|'research'|'library'|'calendar'|'settings';
 type CourseTab='overview'|'sources'|'concepts'|'performance';
 const repo=new LocalRepository();
-const nav:[View,string,ComponentType][]=[['today','اليوم',Home],['courses','موادي',BookOpen],['study','الدراسة',Brain],['assignments','الواجبات',ClipboardList],['research','البحث',Search],['library','مكتبتي',Library],['calendar','جدولي',CalendarDays],['settings','الإعدادات',Settings]];
+const nav:[View,string,ComponentType][]=[['today','اليوم',Home],['courses','موادي',BookOpen],['study','الدراسة',Brain],['assignments','الواجبات',ClipboardList],['academic','الأكاديمية',GraduationCap],['research','البحث',Search],['library','مكتبتي',Library],['calendar','جدولي',CalendarDays],['settings','الإعدادات',Settings]];
 function clone<T>(x:T):T{try{return structuredClone(x)}catch{return JSON.parse(JSON.stringify(x)) as T}}
 function useStateRepo(){const [s,setS]=useState<AppState>(clone(repo.state));useEffect(()=>{const f=()=>setS(clone(repo.state));window.addEventListener('scholar-state',f);return()=>window.removeEventListener('scholar-state',f)},[]);return s}
 function pageFromRef(ref?:string){const n=Number(String(ref||'').match(/(?:ص|page)\s*(\d+)/i)?.[1]);return Number.isFinite(n)&&n>0?n:1}
@@ -28,7 +29,7 @@ export default function ScholarApp(){
  if(!state.profile.onboarded)return <Onboarding/>;
  return <div className="app-shell" dir="rtl"><Sidebar state={state} view={view} go={go} drawer={drawer} setDrawer={setDrawer}/><MobileNav view={view} go={go} setDrawer={setDrawer}/><main><Topbar q={q} setQ={setQ} setDrawer={setDrawer}/><div className="content">
   {q.trim()?<GlobalSearch state={state} q={q} openCourse={openCourse} openSource={(m)=>setReader({m,page:1})} clear={()=>setQ('')}/>:<>
-  {view==='today'&&<Today state={state} openCourse={openCourse} openStudy={openStudy} go={go}/>} {view==='courses'&&<Courses state={state} openCourse={openCourse} notify={notify}/>} {view==='course'&&active&&<CourseWorkspace state={state} course={active} openSource={(m,p=1)=>setReader({m,page:p})} startStudy={()=>openStudy(active.id)} notify={notify}/>} {view==='course'&&!active&&<Empty title="اختر مادة" icon={BookOpen}/>} {view==='study'&&<Study state={state} initialCourseId={studyCourseId} openSource={(m,p=1)=>setReader({m,page:p})} notify={notify}/>} {view==='assignments'&&<Assignments state={state} notify={notify}/>} {view==='research'&&<Research/>} {view==='library'&&<LibraryView state={state} openCourse={openCourse} openSource={(m)=>setReader({m,page:1})}/>} {view==='calendar'&&<CalendarView state={state}/>} {view==='settings'&&<SettingsView state={state} notify={notify}/>}</>}
+  {view==='today'&&<Today state={state} openCourse={openCourse} openStudy={openStudy} go={go}/>} {view==='courses'&&<Courses state={state} openCourse={openCourse} notify={notify}/>} {view==='course'&&active&&<CourseWorkspace state={state} course={active} openSource={(m,p=1)=>setReader({m,page:p})} startStudy={()=>openStudy(active.id)} notify={notify}/>} {view==='course'&&!active&&<Empty title="اختر مادة" icon={BookOpen}/>} {view==='study'&&<Study state={state} initialCourseId={studyCourseId} openSource={(m,p=1)=>setReader({m,page:p})} notify={notify}/>} {view==='assignments'&&<Assignments state={state} notify={notify}/>} {view==='academic'&&<AcademicHub state={state} notify={notify}/>} {view==='research'&&<Research/>} {view==='library'&&<LibraryView state={state} openCourse={openCourse} openSource={(m)=>setReader({m,page:1})}/>} {view==='calendar'&&<CalendarView state={state}/>} {view==='settings'&&<SettingsView state={state} notify={notify}/>}</>}
  </div></main>{reader&&<SourceReader material={reader.m} initialPage={reader.page} onClose={()=>setReader(null)}/>}<EngineProgress/>{toast&&<div className="toast"><CheckCircle2/>{toast}</div>}</div>
 }
 
