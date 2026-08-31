@@ -1,93 +1,35 @@
-type PuterLike={
-  ai?:{
-    chat?:(...args:any[])=>Promise<any>;
-    img2txt?:(...args:any[])=>Promise<any>;
-    speech2txt?:(...args:any[])=>Promise<any>;
-    txt2speech?:(...args:any[])=>Promise<any>;
-    txt2img?:(...args:any[])=>Promise<any>;
-    txt2vid?:(...args:any[])=>Promise<any>;
-  };
-  auth?:{isSignedIn?:()=>boolean;signIn?:()=>Promise<any>};
-};
+const CORE='https://scholarmcp-core-75hnna.v2.appdeploy.ai';
+let lastStatus={stage:'cloud',progress:100,message:'Scholar AI الداخلي جاهز'};
 
-declare global{interface Window{puter?:PuterLike}}
-
-const sleep=(ms:number)=>new Promise(r=>setTimeout(r,ms));
-let lastStatus={stage:'cloud',progress:100,message:'Scholar AI السحابي جاهز'};
-
-async function getPuter(timeout=15000){
-  const start=Date.now();
-  while(Date.now()-start<timeout){
-    if(window.puter?.ai?.chat)return window.puter;
-    await sleep(120);
-  }
-  throw new Error('تعذر الاتصال بمحرك Scholar AI السحابي. تحقق من الإنترنت وأعد المحاولة.');
+async function corePost(path:string,body:unknown){
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),120000);
+  try{
+    const res=await fetch(`${CORE}/api/${path}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:controller.signal,credentials:'omit'});
+    const data=await res.json().catch(()=>({error:`HTTP ${res.status}`}));
+    if(!res.ok)throw new Error(String(data?.error||data?.message||`تعذر تنفيذ الطلب (${res.status})`));
+    return data;
+  }catch(err){
+    if((err as Error)?.name==='AbortError')throw new Error('انتهت مهلة Scholar AI. أعد المحاولة.');
+    throw err;
+  }finally{clearTimeout(timer)}
 }
 
-function responseText(value:any):string{
-  if(typeof value==='string')return value;
-  if(typeof value?.text==='string')return value.text;
-  const content=value?.message?.content;
-  if(typeof content==='string')return content;
-  if(Array.isArray(content))return content.map((x:any)=>typeof x==='string'?x:(x?.text||'')).join('\n');
-  if(typeof value?.message==='string')return value.message;
-  return '';
+async function blobToBase64(blob:Blob){
+  return new Promise<string>((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>{const value=String(reader.result||'');resolve(value.includes(',')?value.slice(value.indexOf(',')+1):value)};reader.onerror=()=>reject(reader.error||new Error('تعذر قراءة الملف'));reader.readAsDataURL(blob)});
 }
-function stripFence(text:string){return text.trim().replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'').trim()}
-function parseJSON(text:string){
-  const cleaned=stripFence(text);
-  try{return JSON.parse(cleaned)}catch{}
-  const a=cleaned.indexOf('{'),b=cleaned.lastIndexOf('}');
-  if(a>=0&&b>a)try{return JSON.parse(cleaned.slice(a,b+1))}catch{}
-  throw new Error('وصل رد غير منظم من Scholar AI. أعد المحاولة.');
-}
-function contextOf(payload:any){return String(payload?.context||'').slice(0,90000)}
-function commonRules(){return `
-أنت المحرك الأكاديمي الداخلي لمنصة ScholarMCP.
-قواعد إلزامية:
-1) اعتمد على SOURCE_CONTEXT فقط في أي معلومة تخص المادة. لا تخترع حقائق من خارج المصدر.
-2) تجاهل كلمات البنية التقنية مثل SOURCE وPAGE وPDF وDOCX وPPTX كأنها مفاهيم دراسية.
-3) عندما لا تجد المعلومة في المصدر قل إنها غير موجودة، ولا تخمّن.
-4) حافظ على المصطلحات العلمية الأصلية كما وردت، مع شرح عربي واضح عند الحاجة.
-5) أي سؤال أو بطاقة أو ملخص يجب أن يكون قابلاً للتتبع إلى صفحة/مرجع داخل المصدر إن أمكن.
-6) أعد JSON صالحاً فقط بلا markdown وبلا مقدمة أو خاتمة.`}
-function taskPrompt(action:string,payload:any){
-  const ctx=contextOf(payload);
-  const rules=commonRules();
-  if(action==='chat')return `${rules}\nالمطلوب: أجب عن سؤال الطالب من المصدر حصراً.\nأعد {"text":"...","truth":"supported|unverified","sourceRefs":["ص 1"]}.\nQUESTION: ${String(payload?.question||'')}\nSOURCE_CONTEXT:\n${ctx}`;
-  if(action==='summary')return `${rules}\nأنشئ ملخصاً دراسياً دقيقاً لا يختزل التفاصيل التي يمكن أن يأتي منها سؤال امتحان.\nأعد {"summary":"...","keyConcepts":[{"title":"...","definition":"...","sourceRef":"ص N"}],"estimatedCoverage":0,"omitted":[],"examRisk":["..."]}.\nSOURCE_CONTEXT:\n${ctx}`;
-  if(action==='flashcards')return `${rules}\nأنشئ ${Math.max(6,Math.min(40,Number(payload?.count)||16))} بطاقة active-recall، كل بطاقة فكرة واحدة، بلا تكرار.\nأعد {"cards":[{"front":"...","back":"...","topic":"...","sourceRef":"ص N"}]}.\nSOURCE_CONTEXT:\n${ctx}`;
-  if(action==='quiz')return `${rules}\nأنشئ ${Math.max(5,Math.min(30,Number(payload?.count)||10))} أسئلة امتحانية متنوعة من المصدر. الخيارات الأربعة يجب أن تكون معقولة، لا تجعل الصحيح مكشوفاً بالطول أو الصياغة.\nأعد {"questions":[{"question":"...","choices":["...","...","...","..."],"answerIndex":0,"explanation":"...","sourceRef":"ص N","topic":"...","difficulty":"easy|medium|hard"}]}.\nSOURCE_CONTEXT:\n${ctx}`;
-  if(action==='mindmap')return `${rules}\nاستخرج خريطة مفاهيم هرمية حقيقية من المادة.\nأعد {"nodes":[{"id":"root","label":"...","definition":"...","sourceRef":"ص N","parent":null},{"id":"n1","label":"...","definition":"...","sourceRef":"ص N","parent":"root"}]}.\nSOURCE_CONTEXT:\n${ctx}`;
-  if(action==='study')return `${rules}\nابنِ جلسة تعلم تفاعلية قصيرة، تبدأ بالفهم ثم الاسترجاع ثم التثبيت، ولا تكتف بملخص.\nأعد {"steps":[{"title":"...","detail":"...","sourceRef":"ص N","prompt":"سؤال استرجاع اختياري"}]}.\nSOURCE_CONTEXT:\n${ctx}`;
-  if(action==='translate')return `${rules}\nترجم النص التالي بالكامل إلى ${String(payload?.target||'العربية')}. ممنوع الحذف أو التلخيص. احتفظ بأرقام الصفحات الظاهرة، وبالمصطلح العلمي الأصلي بين قوسين عندما تمنع ترجمته الغموض.\nأعد {"text":"...","glossary":[{"term":"...","translation":"..."}]}.\nSOURCE_CONTEXT:\n${ctx}`;
-  if(action==='assignment')return `${rules}\nساعد الطالب على بناء العمل الأكاديمي من المصدر والتعليمات من دون اختلاق مراجع.\nINSTRUCTIONS: ${String(payload?.instructions||'')}\nRUBRIC: ${String(payload?.rubric||'')}\nأعد {"checklist":[{"text":"...","required":true}],"outline":"...","draft":"...","assessment":{"criteria":[{"name":"...","status":"ok|weak|missing","feedback":"..."}],"missing":[]}}.\nSOURCE_CONTEXT:\n${ctx}`;
-  if(action==='package')return `${rules}\nحوّل المصدر إلى حزمة سيمنار/عرض أكاديمي قابلة للتعديل.\nأعد {"title":"...","summary":"...","outline":["..."],"slides":[{"title":"...","bullets":["..."],"notes":"..."}],"references":["..."]}. يجب أن تكون الشرائح مختصرة لكن Speaker Notes مفيدة.\nSOURCE_CONTEXT:\n${ctx}`;
-  return `${rules}\nACTION: ${action}\nPAYLOAD: ${JSON.stringify({...payload,context:ctx})}`;
-}
-
-async function callChat(prompt:string){
-  const p=await getPuter();
-  lastStatus={stage:'cloud',progress:35,message:'Scholar AI يعالج الطلب على السحابة'};
-  let result:any;
-  try{result=await p.ai!.chat!(prompt,{model:'gpt-5-nano'})}
-  catch(first){
-    console.warn('ScholarMCP primary cloud model failed, retrying default',first);
-    result=await p.ai!.chat!(prompt);
-  }
-  lastStatus={stage:'cloud',progress:100,message:'اكتملت المعالجة السحابية'};
-  return responseText(result);
+async function sourceBlob(source:File|Blob|string){
+  if(source instanceof Blob)return source;
+  if(/^data:/i.test(source))return fetch(source).then(r=>r.blob());
+  if(/^https?:/i.test(source)){const r=await fetch(source,{credentials:'omit'});if(!r.ok)throw new Error('تعذر قراءة المصدر');return r.blob()}
+  return new Blob([source],{type:'text/plain'});
 }
 
 function translationChunks(raw:string,max=24000){
   const pageParts=raw.split(/(?=\[\[PAGE\s+\d+\]\])/g).filter(Boolean);
   const out:string[]=[];let current='';
   for(const part of pageParts){
-    if(part.length>max){
-      if(current.trim()){out.push(current);current=''}
-      for(let i=0;i<part.length;i+=max)out.push(part.slice(i,i+max));
-      continue;
-    }
+    if(part.length>max){if(current.trim()){out.push(current);current=''}for(let i=0;i<part.length;i+=max)out.push(part.slice(i,i+max));continue}
     if(current&&current.length+part.length>max){out.push(current);current=part}else current+=part;
   }
   if(current.trim())out.push(current);
@@ -97,9 +39,8 @@ async function translateLong(payload:any){
   const raw=String(payload?.context||'');const parts=translationChunks(raw);const texts:string[]=[];const glossary=new Map<string,string>();
   for(let i=0;i<parts.length;i++){
     lastStatus={stage:'translate',progress:Math.round((i/parts.length)*100),message:`ترجمة الجزء ${i+1} من ${parts.length}`};
-    const text=await callChat(taskPrompt('translate',{...payload,context:parts[i]}));
-    if(!text)throw new Error(`تعذرت ترجمة الجزء ${i+1}.`);
-    const data=parseJSON(text);texts.push(String(data.text||''));
+    const data:any=await corePost('task',{action:'translate',payload:{...payload,context:parts[i]}});
+    texts.push(String(data.text||''));
     for(const g of data.glossary||[]){const term=String(g.term||'').trim();if(term&&!glossary.has(term))glossary.set(term,String(g.translation||''))}
   }
   lastStatus={stage:'translate',progress:100,message:'اكتملت ترجمة الملف بالكامل'};
@@ -108,69 +49,56 @@ async function translateLong(payload:any){
 
 export async function smartTask(action:string,payload:any){
   if(action==='translate'&&String(payload?.context||'').length>70000)return translateLong(payload);
-  const prompt=taskPrompt(action,payload);
-  const text=await callChat(prompt);
-  if(!text)throw new Error('لم يرجع Scholar AI نتيجة قابلة للقراءة.');
-  return parseJSON(text);
+  lastStatus={stage:'cloud',progress:35,message:'Scholar AI يعالج الطلب داخل المنصة'};
+  const data=await corePost('task',{action,payload});
+  lastStatus={stage:'cloud',progress:100,message:'اكتملت المعالجة'};
+  return data;
+}
+
+export async function customTask(prompt:string,context=''){
+  lastStatus={stage:'cloud',progress:35,message:'Scholar AI يعالج المهمة الأكاديمية'};
+  const data=await corePost('task',{action:'custom',payload:{prompt,context}});
+  lastStatus={stage:'cloud',progress:100,message:'اكتملت المهمة الأكاديمية'};
+  return data;
 }
 
 export async function ocrSource(source:File|Blob|string){
-  const p=await getPuter();
-  lastStatus={stage:'ocr',progress:25,message:'قراءة الصفحة على السحابة'};
-  try{
-    const result=await p.ai!.img2txt!({source,provider:'mistral'});
-    const text=typeof result==='string'?result:responseText(result);
-    lastStatus={stage:'ocr',progress:100,message:'اكتملت قراءة الصفحة'};
-    return text.trim();
-  }catch(first){
-    console.warn('Mistral OCR failed, using default OCR',first);
-    const result=await p.ai!.img2txt!(source);
-    const text=typeof result==='string'?result:responseText(result);
-    lastStatus={stage:'ocr',progress:100,message:'اكتملت قراءة الصفحة'};
-    return text.trim();
-  }
+  const blob=await sourceBlob(source);
+  if(blob.size>6_000_000)throw new Error('الصورة كبيرة جداً للقراءة. قلل حجمها أو ارفعها كـPDF.');
+  lastStatus={stage:'ocr',progress:25,message:'Scholar OCR يقرأ الصفحة داخل المنصة'};
+  const data=await blobToBase64(blob);
+  const result:any=await corePost('ocr',{data,mimeType:blob.type||'image/jpeg'});
+  lastStatus={stage:'ocr',progress:100,message:'اكتملت قراءة الصفحة'};
+  return String(result.text||'').trim();
 }
-
-export async function structuredOCR(source:File|Blob|string){
-  const text=await ocrSource(source);
-  return {text,provider:'cloud',handwriting:true};
-}
+export async function structuredOCR(source:File|Blob|string){const text=await ocrSource(source);return {text,provider:'scholarmcp-core',handwriting:true}}
 export async function handwrittenOCR(source:File|Blob|string){
-  const p=await getPuter();
-  try{
-    const result=await p.ai!.chat!('اقرأ كل النص المكتوب في هذه الصورة حرفياً. النص قد يكون عربياً أو إنكليزياً ومكتوباً باليد. لا تلخص ولا تشرح. أعد النص فقط.',source,{model:'gpt-5-nano'});
-    const text=responseText(result).trim();
-    return text||await ocrSource(source);
-  }catch{return ocrSource(source)}
+  const blob=await sourceBlob(source);const data=await blobToBase64(blob);
+  const result:any=await corePost('ocr',{data,mimeType:blob.type||'image/jpeg',prompt:'اقرأ كل النص المكتوب في الصورة حرفياً. قد يكون عربياً أو إنكليزياً أو بخط اليد. لا تلخص ولا تشرح.'});
+  return String(result.text||'').trim();
 }
-export function ocrCapabilities(){return {mode:'cloud',printed:true,handwritten:true,multilingual:true,deviceCompute:false}}
+export function ocrCapabilities(){return {mode:'scholarmcp-core',printed:true,handwritten:true,multilingual:true,deviceCompute:false}}
 
-export async function speechToText(source:File|Blob|string,options:any={}){
-  const p=await getPuter();
-  if(!p.ai?.speech2txt)throw new Error('التفريغ الصوتي غير متاح حالياً.');
-  lastStatus={stage:'speech',progress:30,message:'تفريغ المحاضرة على السحابة'};
-  const result=await p.ai.speech2txt(source,{...options});
+export async function speechToText(source:File|Blob|string,_options:any={}){
+  const blob=await sourceBlob(source);
+  if(blob.size>4_000_000)throw new Error('التسجيل كبير جداً كقطعة واحدة. ScholarMCP سيقسّم المحاضرات الطويلة إلى مقاطع في التحديث التالي.');
+  lastStatus={stage:'speech',progress:30,message:'تفريغ المحاضرة داخل ScholarMCP'};
+  const data=await blobToBase64(blob);
+  const result:any=await corePost('transcribe',{data,mimeType:blob.type||'audio/webm'});
   lastStatus={stage:'speech',progress:100,message:'اكتمل تفريغ المحاضرة'};
-  return typeof result==='string'?{text:result}:result;
-}
-export async function textToSpeech(text:string,options:any={}){
-  const p=await getPuter();
-  if(!p.ai?.txt2speech)throw new Error('الصوت السحابي غير متاح حالياً.');
-  return p.ai.txt2speech(text.slice(0,2900),options);
-}
-export async function generateStudyImage(prompt:string,options:any={}){
-  const p=await getPuter();
-  if(!p.ai?.txt2img)throw new Error('توليد الصور غير متاح حالياً.');
-  return p.ai.txt2img(prompt,options);
-}
-export async function generateStudyVideo(prompt:string,options:any={}){
-  const p=await getPuter();
-  if(!p.ai?.txt2vid)throw new Error('توليد الفيديو غير متاح حالياً.');
-  return p.ai.txt2vid(prompt,options);
+  return {text:String(result.text||''),segments:Array.isArray(result.segments)?result.segments:[]};
 }
 
-export function localAIStatus(){return {...lastStatus,deviceCompute:false}}
-export async function resetLocalAI(){lastStatus={stage:'cloud',progress:100,message:'Scholar AI السحابي جاهز'}}
+export async function textToSpeech(text:string,_options:any={}){
+  if(!('speechSynthesis'in window))throw new Error('القراءة الصوتية غير مدعومة على هذا الجهاز.');
+  window.speechSynthesis.cancel();
+  const utterance=new SpeechSynthesisUtterance(text.slice(0,9000));utterance.lang=/[\u0600-\u06ff]/.test(text)?'ar-IQ':'en-US';utterance.rate=.95;window.speechSynthesis.speak(utterance);return true;
+}
+export async function generateStudyImage(_prompt:string,_options:any={}){throw new Error('مولد الرسوم الدراسية قيد الربط بالمحرك الداخلي.')}
+export async function generateStudyVideo(_prompt:string,_options:any={}){throw new Error('مولد الفيديو الدراسي قيد الربط بالمحرك الداخلي.')}
+
+export function localAIStatus(){return {...lastStatus,deviceCompute:false,provider:'scholarmcp-core'}}
+export async function resetLocalAI(){lastStatus={stage:'cloud',progress:100,message:'Scholar AI الداخلي جاهز'}}
 export async function disposeLocalAI(){return}
 export async function disposeOCR(){return}
-export async function aiAvailable(){try{await getPuter(2500);return true}catch{return false}}
+export async function aiAvailable(){try{const res=await fetch(`${CORE}/api/_healthcheck`,{credentials:'omit'});return res.ok}catch{return false}}
