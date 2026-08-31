@@ -1,0 +1,26 @@
+name: One-time ScholarApp grounding refactor
+on:
+  push:
+    paths:
+      - scripts/patch-scholarapp.mjs
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/patch-scholarapp.mjs
+      - name: Commit patch if needed
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name "ScholarMCP Builder"
+          git config user.email "actions@users.noreply.github.com"
+          git add src/ScholarApp.tsx
+          git commit -m "fix(grounding): route citations to exact source pages"
+          git push
