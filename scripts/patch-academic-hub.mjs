@@ -9,3 +9,4 @@ must("<div className=\"tabs academic-tabs\"><button className={tab==='syllabus'?
 if(process.exitCode)process.exit(process.exitCode);
 fs.writeFileSync(path,s);
 console.log('AcademicHub full feature wiring applied.');
+// v2: trigger wiring after workflow installation.
