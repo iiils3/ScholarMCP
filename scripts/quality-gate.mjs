@@ -3,9 +3,13 @@ const read=p=>fs.readFileSync(p,'utf8');
 const exists=p=>fs.existsSync(p);
 const failures=[];
 function check(ok,msg){if(!ok)failures.push(msg)}
+function walk(dir){return fs.readdirSync(dir,{withFileTypes:true}).flatMap(x=>x.isDirectory()?walk(`${dir}/${x.name}`):[`${dir}/${x.name}`])}
+const srcText=walk('src').filter(p=>/\.(ts|tsx|js|jsx)$/.test(p)).map(read).join('\n');
 const index=read('index.html');
 const bridge=read('src/puter.ts');
-const academicAI=read('src/academic-ai.ts');
+const localAI=read('src/local-ai.ts');
+const localOCR=read('src/local-ocr.ts');
+const localSpeech=read('src/local-speech.ts');
 const app=read('src/ScholarApp.tsx');
 const parser=read('src/parser.ts');
 const academic=exists('src/AcademicHub.tsx')?read('src/AcademicHub.tsx'):'';
@@ -18,13 +22,13 @@ const project=exists('src/AcademicProjectStudio.tsx')?read('src/AcademicProjectS
 const video=exists('src/StudyVideoStudio.tsx')?read('src/StudyVideoStudio.tsx'):'';
 const bag=exists('src/academic-bag.ts')?read('src/academic-bag.ts'):'';
 
-check(!/puter\.com|js\.puter|window\.puter/i.test(index+bridge+academicAI),'Third-party Puter login/runtime is still present');
-check(bridge.includes('scholarmcp-core-75hnna.v2.appdeploy.ai'),'ScholarMCP internal cloud core is missing');
-check(bridge.includes("corePost('ocr'")&&bridge.includes('ocrSource'),'Internal OCR bridge is missing');
-check(bridge.includes("corePost('transcribe'")&&bridge.includes('speechToText'),'Internal lecture transcription bridge is missing');
-check(bridge.includes('speechSynthesis'),'In-platform text-to-speech fallback is missing');
-check(!bridge.includes("from './local-ai'"),'AI bridge still imports the on-device LLM');
-check(!bridge.includes("from './local-ocr'"),'AI bridge still imports the on-device OCR');
+check(!/puter\.com|js\.puter|window\.puter|appdeploy\.ai|scholarmcp-core/i.test(index+srcText),'External AI runtime/login dependency is still present');
+check(bridge.includes("from './local-ai'")&&bridge.includes("from './local-ocr'")&&bridge.includes("from './local-speech'"),'Scholar engine bridge is not fully local');
+check(localAI.includes('Qwen3-0.6B-ONNX')&&localAI.includes("import('@huggingface/transformers')"),'Local Qwen engine is missing');
+check(localAI.includes("case'custom'")&&localAI.includes('customTask'),'Generic academic local task path is missing');
+check(localOCR.includes('granite-docling-258M-ONNX')&&localOCR.includes('trocr-small-handwritten'),'Local document/handwriting OCR is incomplete');
+check(localSpeech.includes('whisper-tiny')&&localSpeech.includes('automatic-speech-recognition'),'Local lecture transcription engine is missing');
+check(bridge.includes('speechSynthesis'),'In-platform text-to-speech is missing');
 check(parser.includes("ext==='pdf'")&&parser.includes('ocrSource'),'PDF + OCR ingestion path missing');
 check(app.includes("view==='today'"),'Today route missing');
 check(app.includes("view==='courses'"),'Courses route missing');
@@ -57,4 +61,4 @@ check(video.includes('customTask')&&video.includes('MediaRecorder')&&video.inclu
 check(bag.includes('JSZip')&&bag.includes('flashcards.tsv')&&bag.includes('manifest.json'),'Full academic bag export is incomplete');
 
 if(failures.length){console.error('\nScholarMCP quality gate FAILED:\n- '+failures.join('\n- '));process.exit(1)}
-console.log('ScholarMCP quality gate passed: no third-party login flow; internal core, Course Brain, long lectures, Academic Project, AI video, academic bag, seminar, Exam DNA, Smart Feed and Scholar Day are wired.');
+console.log('ScholarMCP quality gate passed: repository-local Qwen, OCR, Whisper, Course Brain, long lectures, Academic Project, AI video, academic bag, seminar, Exam DNA, Smart Feed and Scholar Day are wired with no external AI login/runtime.');
