@@ -100,22 +100,24 @@ async function generate(messages:any[],max_new_tokens=900){
   const gen=await getGenerator();emit('Scholar AI يعالج المادة محليًا…',1);
   return responseText(await gen(messages,{max_new_tokens,do_sample:false,repetition_penalty:1.04,return_full_text:false} as any));
 }
-async function translateChunks(raw:string,target:string){
+async function translateChunks(raw:string,target:string,glossaryLock:string[]=[]){
   const blocks=pageBlocks(raw),pieces:string[]=[];
+  const locked=[...new Set(glossaryLock.map(x=>String(x).trim()).filter(Boolean))].slice(0,120);
+  const lockRule=locked.length?`\nGlossary Lock إلزامي: اترك هذه المصطلحات حرفياً كما هي دون ترجمة أو تغيير تهجئة: ${locked.join(' | ')}.`:'';
   for(const b of blocks.length?blocks:[{source:'المصدر',page:1,text:raw}]){
     if(!b.text.trim())continue;
     for(let i=0;i<b.text.length;i+=6200){
       const chunk=b.text.slice(i,i+6200);
-      const out=await generate([{role:'system',content:`ترجم أكاديميًا إلى ${target} ترجمة كاملة بلا تلخيص. حافظ على المصطلحات العلمية والمعنى وترتيب الفقرات. أعد الترجمة فقط. /no_think`},{role:'user',content:chunk}],1100);
+      const out=await generate([{role:'system',content:`ترجم أكاديميًا إلى ${target} ترجمة كاملة بلا تلخيص. حافظ على المصطلحات العلمية والمعنى وترتيب الفقرات.${lockRule} أعد الترجمة فقط. /no_think`},{role:'user',content:chunk}],1100);
       pieces.push(`SOURCE ${b.source}\n[[PAGE ${b.page}]]\n${out}`);
     }
   }
-  return{text:pieces.join('\n\n'),glossary:[],complete:true};
+  return{text:pieces.join('\n\n'),glossary:locked.map(term=>({term,translation:term,locked:true})),glossaryLock:locked,complete:true};
 }
 
 export async function smartTask(action:string,payload:AnyObj){
   const raw=String(payload?.context||'');
-  if(action==='translate')return translateChunks(raw,payload?.target||'العربية');
+  if(action==='translate')return translateChunks(raw,payload?.target||'العربية',Array.isArray(payload?.glossaryLock)?payload.glossaryLock:[]);
   const context=selectContext(raw,action,payload);
   const max=action==='summary'||action==='package'||action==='custom'?1500:950;
   const text=await generate([{role:'system',content:BASE},{role:'user',content:`${taskInstruction(action,payload)}\n\n--- المصدر ---\n${context}\n--- نهاية المصدر ---`}],max);
