@@ -1,7 +1,7 @@
 {
   "name": "scholarmcp",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.6.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,6 +10,9 @@
     "typecheck": "tsc -b --pretty false"
   },
   "dependencies": {
+    "@huggingface/transformers": "^4.2.0",
+    "@xyflow/react": "^12.10.2",
+    "ankipack": "^0.3.0",
     "docx": "^9.5.1",
     "jszip": "^3.10.1",
     "lucide-react": "^0.544.0",
@@ -17,11 +20,15 @@
     "pdfjs-dist": "^5.4.149",
     "pptxgenjs": "^4.0.1",
     "react": "^19.1.1",
-    "react-dom": "^19.1.1"
+    "react-dom": "^19.1.1",
+    "sql.js": "^1.13.0",
+    "ts-fsrs": "^5.4.1",
+    "youtubei.js": "^18.0.0"
   },
   "devDependencies": {
     "@types/react": "^19.1.16",
     "@types/react-dom": "^19.1.9",
+    "@types/sql.js": "^1.4.9",
     "@vitejs/plugin-react": "^5.0.4",
     "typescript": "^5.9.3",
     "vite": "^7.1.7"
