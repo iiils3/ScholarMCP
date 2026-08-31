@@ -1,7 +1,7 @@
 import {useEffect,useRef,useState} from 'react';
 import {BookOpen,Brain,CheckCircle2,FileAudio,Layers3,LoaderCircle,Mic,Play,Save,Square,Upload,X} from 'lucide-react';
 import {aiTask,LocalRepository} from './lib';
-import {speechToText} from './puter';
+import {speechToText} from './scholar-engine';
 import './lecture.css';
 
 const repo=new LocalRepository();

@@ -1,4 +1,4 @@
-import { customTask } from './puter';
+import { customTask } from './scholar-engine';
 
 const ground='أنت وكيل أكاديمي داخل ScholarMCP. لا تخترع بيانات غير موجودة في المصدر. أعد JSON صالحاً فقط بلا markdown. إذا كانت قيمة غير موجودة ضع null أو مصفوفة فارغة.';
 

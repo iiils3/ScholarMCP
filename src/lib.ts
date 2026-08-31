@@ -90,7 +90,7 @@ async function localFallback(action:string,payload:any){
 }
 
 export async function aiTask(action:string,payload:any){
-  try{return await (await import('./puter')).smartTask(action,payload)}
+  try{return await (await import('./scholar-engine')).smartTask(action,payload)}
   catch(e){console.warn('ScholarMCP AI fallback:',e);return localFallback(action,payload)}
 }
 

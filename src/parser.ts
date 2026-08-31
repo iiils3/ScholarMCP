@@ -1,4 +1,4 @@
-import { ocrSource,disposeOCR } from './puter';
+import { ocrSource,disposeOCR } from './scholar-engine';
 
 export type ParseResult={text:string;pages:number;error?:string};
 async function canvasBlob(canvas:HTMLCanvasElement){return new Promise<Blob>((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('تعذر تجهيز صورة الصفحة للـOCR')),'image/jpeg',0.9))}

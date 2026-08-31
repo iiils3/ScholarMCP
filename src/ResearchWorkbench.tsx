@@ -1,7 +1,7 @@
 import {useMemo,useState} from 'react';
 import {BookOpenCheck,CheckCircle2,ClipboardCheck,FileSearch,LibraryBig,LoaderCircle,Quote,Search,ShieldAlert,Sparkles} from 'lucide-react';
 import {type AppState,retrieve} from './lib';
-import {customTask} from './puter';
+import {customTask} from './scholar-engine';
 import {scholarSearch,type ScholarPaper} from './research';
 import './research-workbench.css';
 

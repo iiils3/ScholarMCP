@@ -1,7 +1,7 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {BookOpen,Brain,CheckCircle2,Clock,Download,FileCheck2,GitBranch,Languages,LoaderCircle,Mic,Play,RotateCcw,ShieldCheck,Square,Volume2} from 'lucide-react';
 import {type AppState,LocalRepository,aiTask,courseMastery,exportDocx,retrieve,weakest} from './lib';
-import {customTask,speechToText,textToSpeech} from './puter';
+import {customTask,speechToText,textToSpeech} from './scholar-engine';
 import './student-tools.css';
 
 type Props={state:AppState;notify:(message:string)=>void};

@@ -1,7 +1,7 @@
 import {useMemo,useState} from 'react';
 import {BookOpen,CheckCircle2,Download,FileCheck2,FileText,LoaderCircle,Presentation,ShieldCheck,Sparkles,TriangleAlert} from 'lucide-react';
 import {type AppState,LocalRepository,exportDocx,exportPptx,retrieve} from './lib';
-import {customTask} from './puter';
+import {customTask} from './scholar-engine';
 import {exportAcademicBag} from './academic-bag';
 import './academic-project.css';
 

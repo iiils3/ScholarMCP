@@ -1,7 +1,7 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {Download,LoaderCircle,Pause,Play,Sparkles,Video} from 'lucide-react';
 import {type AppState,retrieve,safeFileName} from './lib';
-import {customTask} from './puter';
+import {customTask} from './scholar-engine';
 import './study-video.css';
 
 type Props={state:AppState;notify:(message:string)=>void};
