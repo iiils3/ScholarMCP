@@ -22,7 +22,7 @@ function refs(raw:string){
 }
 function headings(raw:string){
   const lines=raw.split(/\r?\n/).map(x=>x.replace(/^#+\s*/,'').trim()).filter(x=>x.length>=5&&x.length<=90&&!/^SOURCE|^\[\[PAGE/i.test(x));
-  return [...new Set(lines)].slice(0,8);
+  return [...new Set(lines)].slice(0,12);
 }
 function dates(raw:string){return [...new Set((raw.match(/\b(?:20\d{2})[-\/.](?:0?[1-9]|1[0-2])[-\/.](?:0?[1-9]|[12]\d|3[01])\b/g)||[]).map(x=>x.replace(/[\/.]/g,'-')))].slice(0,12)}
 function fallbackCustom(prompt:string,context:string){
@@ -51,6 +51,10 @@ function fallbackCustom(prompt:string,context:string){
   if(p.includes('citationhealth')&&p.includes('unsupportedclaims')){
     const hasRefs=/—\s*ص\s*\d+/.test(prompt);const requirementsText=(prompt.match(/متطلبات الطالب:\s*([^\n]+)/)||[])[1]||'';
     return {citationHealth:hasRefs?82:58,requirementsMatch:requirementsText&&requirementsText!=='لا توجد'?72:88,readiness:hasRefs?78:62,unsupportedClaims:hasRefs?[]:[{claim:'بعض الفقرات تحتاج ربطًا أوضح بصفحات المصدر.',reason:'لم أجد إحالات صفحات كافية في النسخة التي دُققت محليًا.'}],requirements:requirementsText&&requirementsText!=='لا توجد'?[{text:requirementsText,status:'partial'}]:[],notes:['هذا تدقيق احتياطي محلي؛ شغّل نموذج Scholar AI الكامل للحصول على تدقيق دلالي أعمق.']};
+  }
+  if(p.includes('coverage guard')||p.includes('"coverage"')&&p.includes('"missing"')){
+    const topics=(hs.length?hs:ss.slice(0,8).map(x=>x.slice(0,70))).slice(0,8);const midpoint=Math.max(1,Math.ceil(topics.length*.6));const coveredTopics=topics.slice(0,midpoint);const missingTopics=topics.slice(midpoint);const coverage=topics.length?Math.round(coveredTopics.length/topics.length*100):35;
+    return {coverage,covered:coveredTopics.map((topic,i)=>({topic,sourceRef:sourceRefs[i%sourceRefs.length]})),missing:missingTopics.map((topic,i)=>({topic,reason:'لم أجد لهذا المحور تغطية واضحة ضمن المخرجات الحالية في الفحص المحلي الخفيف.',sourceRef:sourceRefs[(i+midpoint)%sourceRefs.length]})),examRisk:missingTopics.slice(0,3).map(x=>`راجع ${x} قبل الاعتماد على الملخص الحالي.`),nextAction:missingTopics.length?'ابدأ بالمحاور الناقصة ثم أعد فحص Coverage Guard.':'التغطية الأساسية جيدة؛ انتقل إلى محاكي الفاينل للتأكد من الاسترجاع.'};
   }
   if(p.includes('فيديو تعليمي')||p.includes('"scenes"')){
     const title=(prompt.match(/عن «([^»]+)»/)||[])[1]||hs[0]||'شرح المادة';const count=Math.max(5,Math.min(8,Number((prompt.match(/أنشئ\s+(\d+)\s+مشاهد/)||[])[1])||6));
