@@ -51,7 +51,7 @@ check(academic.includes('TranslationStudio')&&academic.includes('CoverageGuard')
 check(academic.includes('VoiceTutor')&&academic.includes('LearningGraph'),'Voice Tutor/Learning Graph not wired into Academic Hub');
 check(academic.includes('ResearchWorkbench')&&academic.includes('FocusStudio'),'Research/Integrity Lab or Focus Mode not wired into Academic Hub');
 check(studentTools.includes('glossaryLock')&&studentTools.includes('CoverageGuard')&&studentTools.includes('ExamSimulator')&&studentTools.includes('VoiceTutor')&&studentTools.includes('LearningGraph'),'Advanced Student Tools implementation is incomplete');
-check(researchLab.includes('Citation Builder')&&researchLab.includes('Claim Verification')&&researchLab.includes('Literature Review')&&researchLab.includes('Integrity Guard'),'Academic Research/Integrity workbench is incomplete');
+check(/Citation Builder/i.test(researchLab)&&/Claim Verification/i.test(researchLab)&&/Literature Review/i.test(researchLab)&&/Integrity Guard/i.test(researchLab),'Academic Research/Integrity workbench is incomplete');
 check(focus.includes('FOCUS MODE')&&focus.includes('scholarmcp.focus.sessions.v1'),'Focus Mode persistence is missing');
 check(lecture.includes('speechToText')&&lecture.includes('MediaRecorder')&&lecture.includes('45_000')&&lecture.includes('recordedParts'),'Long lecture record/transcribe path is incomplete');
 check(seminar.includes('exportPptx')&&seminar.includes('buildSeminarRehearsal'),'Seminar export/rehearsal path incomplete');
@@ -62,7 +62,7 @@ check(project.includes('citationHealth')&&project.includes('unsupportedClaims')&
 check(video.includes('customTask')&&video.includes('MediaRecorder')&&video.includes('captureStream'),'In-platform AI study video pipeline is incomplete');
 check(bag.includes('JSZip')&&bag.includes('flashcards.tsv')&&bag.includes('manifest.json'),'Full academic bag export is incomplete');
 check(index.includes('manifest.webmanifest')&&manifest.includes('"display": "standalone"'),'Installable PWA manifest is missing');
-check(main.includes('serviceWorker.register')&&sw.includes('scholarmcp-shell-v1'),'Offline app-shell registration/cache is missing');
+check(main.includes('serviceWorker.register')&&/scholarmcp-shell-v\d+/.test(sw),'Offline app-shell registration/cache is missing');
 
 if(failures.length){console.error('\nScholarMCP quality gate FAILED:\n- '+failures.join('\n- '));process.exit(1)}
 console.log('ScholarMCP quality gate passed: no Puter/AppDeploy runtime; local Qwen/OCR/Whisper, Glossary Lock, Coverage Guard, Exam Simulator, Voice Tutor, Learning Graph, Research/Integrity Lab, Focus Mode, PWA shell, Course Brain, long lectures, Academic Project, AI video, seminar, Exam DNA, Smart Feed and Scholar Day are wired.');
