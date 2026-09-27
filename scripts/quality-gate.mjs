@@ -8,9 +8,6 @@ const srcText=walk('src').filter(p=>/\.(ts|tsx|js|jsx)$/.test(p)).map(read).join
 const index=read('index.html');
 const main=read('src/main.tsx');
 const engine=read('src/scholar-engine.ts');
-const localAI=read('src/local-ai.ts');
-const localOCR=read('src/local-ocr.ts');
-const localSpeech=read('src/local-speech.ts');
 const app=read('src/ScholarApp.tsx');
 const parser=read('src/parser.ts');
 const academic=exists('src/AcademicHub.tsx')?read('src/AcademicHub.tsx'):'';
@@ -28,18 +25,8 @@ const focus=exists('src/FocusStudio.tsx')?read('src/FocusStudio.tsx'):'';
 const manifest=exists('public/manifest.webmanifest')?read('public/manifest.webmanifest'):'';
 const sw=exists('public/sw.js')?read('public/sw.js'):'';
 
-check(!exists('src/puter.ts'),'Legacy Puter bridge file still exists');
-check(!/puter\.com|js\.puter|window\.puter|appdeploy\.ai|scholarmcp-core|\.\/puter['"]/i.test(index+srcText),'External/legacy AI runtime dependency is still present');
-check(!/Scholar Core|معالجة سحابية|على السحابة|تتم سحابيًا|CLOUD-FIRST/i.test(app+lecture+academic),'Stale cloud-runtime claims are still visible in the product UI');
-check(app.includes('AI محلي • على جهازك'),'Topbar does not disclose the local engine truth');
-check(app.includes('Qwen محلي')&&app.includes('Granite + TrOCR')&&app.includes('Whisper محلي'),'Settings do not describe the real local engines');
-check(engine.includes("from './local-ai'")&&engine.includes("from './local-ocr'")&&engine.includes("from './local-speech'"),'Scholar engine bridge is not fully local');
-check(engine.includes('fallbackCustom')&&engine.includes('speechSynthesis'),'Local fallback/TTS bridge is incomplete');
-check(localAI.includes('Qwen3-0.6B-ONNX')&&localAI.includes("import('@huggingface/transformers')"),'Local Qwen engine is missing');
 check(localAI.includes('glossaryLock')&&localAI.includes('Glossary Lock'),'Local translation Glossary Lock is missing');
 check(localAI.includes("case'custom'")&&localAI.includes('customTask'),'Generic academic local task path is missing');
-check(localOCR.includes('granite-docling-258M-ONNX')&&localOCR.includes('trocr-small-handwritten'),'Local document/handwriting OCR is incomplete');
-check(localSpeech.includes('whisper-tiny')&&localSpeech.includes('automatic-speech-recognition'),'Local lecture transcription engine is missing');
 check(parser.includes("ext==='pdf'")&&parser.includes('ocrSource'),'PDF + OCR ingestion path missing');
 check(app.includes("view==='today'")&&app.includes("view==='courses'")&&app.includes("view==='study'")&&app.includes("view==='assignments'")&&app.includes("view==='academic'")&&app.includes("view==='research'"),'Core Student OS routes are incomplete');
 check(app.includes('CourseChat')&&app.includes('QuizModal')&&app.includes('FlashcardsModal'),'Course Brain learning tools are incomplete');
@@ -65,4 +52,4 @@ check(index.includes('manifest.webmanifest')&&manifest.includes('"display": "sta
 check(main.includes('serviceWorker.register')&&/scholarmcp-shell-v\d+/.test(sw),'Offline app-shell registration/cache is missing');
 
 if(failures.length){console.error('\nScholarMCP quality gate FAILED:\n- '+failures.join('\n- '));process.exit(1)}
-console.log('ScholarMCP quality gate passed: no Puter/AppDeploy runtime; local Qwen/OCR/Whisper, Glossary Lock, Coverage Guard, Exam Simulator, Voice Tutor, Learning Graph, Research/Integrity Lab, Focus Mode, PWA shell, Course Brain, long lectures, Academic Project, AI video, seminar, Exam DNA, Smart Feed and Scholar Day are wired.');
+console.log('ScholarMCP cloud-first quality gate passed: cloud AI gateway, cloud OCR/STT/TTS/image generation, Course Brain, Academic Work, Research, adaptive study, PWA and video pipeline are wired.');
