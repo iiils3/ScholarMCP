@@ -25,8 +25,11 @@ const focus=exists('src/FocusStudio.tsx')?read('src/FocusStudio.tsx'):'';
 const manifest=exists('public/manifest.webmanifest')?read('public/manifest.webmanifest'):'';
 const sw=exists('public/sw.js')?read('public/sw.js'):'';
 
-check(localAI.includes('glossaryLock')&&localAI.includes('Glossary Lock'),'Local translation Glossary Lock is missing');
-check(localAI.includes("case'custom'")&&localAI.includes('customTask'),'Generic academic local task path is missing');
+const cloud=read('src/cloud-ai.ts');
+check(cloud.includes("MODEL='gemini-3.8-flash'"),'Cloud AI model gateway is missing');
+check(cloud.includes('puter().ai.chat')&&cloud.includes('img2txt')&&cloud.includes('speech2txt')&&cloud.includes('txt2speech'),'Cloud AI/OCR/STT/TTS gateway is incomplete');
+check(!srcText.includes("from './local-ai'")&&!srcText.includes("from './local-ocr'")&&!srcText.includes("from './local-speech'"),'A source file still imports the removed local AI runtime');
+check(app.includes('Cloud AI')&&app.includes('Cloud OCR')&&app.includes('Cloud Speech-to-Text'),'Settings do not describe the cloud AI runtime');
 check(parser.includes("ext==='pdf'")&&parser.includes('ocrSource'),'PDF + OCR ingestion path missing');
 check(app.includes("view==='today'")&&app.includes("view==='courses'")&&app.includes("view==='study'")&&app.includes("view==='assignments'")&&app.includes("view==='academic'")&&app.includes("view==='research'"),'Core Student OS routes are incomplete');
 check(app.includes('CourseChat')&&app.includes('QuizModal')&&app.includes('FlashcardsModal'),'Course Brain learning tools are incomplete');
