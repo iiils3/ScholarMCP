@@ -52,46 +52,8 @@ function sentences(context:string){return cleanAcademic(context).split(/(?<=[.!?
 function keywords(context:string,limit=20){const stop=new Set('هذا هذه ذلك التي الذي من إلى في على عن مع ثم أو و هو هي تم يتم كما كان تكون يكون بين عند بعد قبل خلال ضمن حيث اذا إذا ما لا كل قد an the and of to in for on is are was were this that with from by as or source page pdf doc docx ppt pptx file'.split(/\s+/));const words=(cleanAcademic(context).match(/[\p{L}\p{N}][\p{L}\p{N}_-]{2,}/gu)||[]).map(x=>x.toLowerCase()).filter(x=>!stop.has(x)&&!/^\d+$/.test(x));const counts=new Map<string,number>();for(const w of words)counts.set(w,(counts.get(w)||0)+1);return [...counts.entries()].sort((a,b)=>b[1]-a[1]).slice(0,limit).map(x=>x[0])}
 function pageRef(context:string,text:string){const i=context.indexOf(text);const ms=[...context.slice(0,Math.max(0,i)).matchAll(/\[\[PAGE (\d+)\]\]/g)];return `ص ${ms.length?ms[ms.length-1][1]:1}`}
 
-async function localFallback(action:string,payload:any){
-  const context=String(payload?.context||'').slice(0,120000);
-  const ss=sentences(context), ks=keywords(context), top=ss.slice(0,18);
-  if(action==='chat'){
-    const terms=String(payload?.question||'').toLowerCase().split(/\s+/).filter((x:string)=>x.length>2);
-    const hits=ss.map(text=>({text,score:terms.reduce((n:number,t:string)=>n+(text.toLowerCase().includes(t)?1:0),0)})).filter(x=>x.score>0).sort((a,b)=>b.score-a.score).slice(0,4);
-    return {text:hits.length?hits.map(x=>`${x.text} (${pageRef(context,x.text)})`).join('\n\n'):'غير موجود في المصدر بصيغة واضحة.',truth:hits.length?'supported':'unverified'};
-  }
-  if(action==='summary'){
-    return {summary:top.join('\n\n'),keyConcepts:ks.slice(0,10).map(k=>{const s=ss.find(x=>x.toLowerCase().includes(k))||'';return {title:k,definition:s.slice(0,260),sourceRef:pageRef(context,s)}}),estimatedCoverage:Math.min(85,Math.max(35,Math.round(top.join(' ').length/Math.max(1,cleanAcademic(context).length)*400))),omitted:['هذه نتيجة محلية احتياطية؛ فعّل اتصال AI لملخص أدق.'],examRisk:ks.slice(0,5)};
-  }
-  if(action==='flashcards'){
-    return {cards:ks.slice(0,Math.min(Number(payload?.count)||10,12)).map((k,i)=>{const s=ss.find(x=>x.toLowerCase().includes(k))||top[i%Math.max(1,top.length)]||k;return {front:`اشرح ${k} حسب المادة.`,back:s.slice(0,300),topic:k,sourceRef:pageRef(context,s)}})};
-  }
-  if(action==='quiz'){
-    const pool=ks.slice(0,16);
-    const questions=pool.slice(0,Math.min(Number(payload?.count)||6,8)).map((term,i)=>{
-      const s=ss.find(x=>x.toLowerCase().includes(term))||top[i%Math.max(1,top.length)]||term;
-      const distractors=pool.filter(x=>x!==term).slice(i+1).concat(pool).filter(x=>x!==term).slice(0,3);
-      const answerIndex=i%4;const choices=[...distractors];while(choices.length<3)choices.push(`خيار ${choices.length+1}`);choices.splice(answerIndex,0,term);
-      return {question:`أي مصطلح يرتبط مباشرة بهذه العبارة؟\n${s.slice(0,220)}`,choices,answerIndex,explanation:`المصطلح «${term}» ورد ضمن سياق العبارة في المصدر.`,sourceRef:pageRef(context,s),topic:term};
-    });
-    return {questions};
-  }
-  if(action==='mindmap'){
-    return {nodes:[{id:'root',label:ks[0]||'المادة',definition:top[0]||'',sourceRef:'ص 1',parent:null},...ks.slice(1,12).map((k,i)=>{const s=ss.find(x=>x.toLowerCase().includes(k))||'';return {id:`n${i+1}`,label:k,definition:s.slice(0,180),sourceRef:pageRef(context,s),parent:'root'}})]};
-  }
-  if(action==='study') return {steps:top.slice(0,5).map((s,i)=>({title:['الفكرة الأساسية','شرح مركز','ربط المفاهيم','استرجاع نشط','تثبيت'][i]||`خطوة ${i+1}`,detail:s}))};
-  if(action==='translate') return {text:'تعذر تشغيل مترجم AI. اتصل بالإنترنت وحاول مرة ثانية.',glossary:[]};
-  if(action==='assignment'){
-    const req=String(payload?.instructions||'').split(/\n|[.;]/).map((x:string)=>x.trim()).filter((x:string)=>x.length>10).slice(0,8);
-    return {checklist:req.map((text:string)=>({text,required:true})),outline:ks.slice(0,6).map((k,i)=>`${i+1}. ${k}`).join('\n'),draft:top.slice(0,8).join('\n\n'),assessment:{criteria:[],missing:['تقييم AI غير متاح حالياً.']}};
-  }
-  if(action==='package') return {title:String(payload?.topic||'ScholarMCP Academic Package'),summary:top.slice(0,6).join('\n\n'),outline:ks.slice(0,8),slides:ks.slice(0,8).map((k,i)=>({title:k,bullets:(ss.filter(s=>s.toLowerCase().includes(k)).slice(0,3).length?ss.filter(s=>s.toLowerCase().includes(k)).slice(0,3):top.slice(i,i+2)).map(s=>s.slice(0,170)),notes:`راجع المصدر حول ${k}.`})),references:['المصادر المرفوعة داخل المادة']};
-  return {text:'المعالجة المحلية الاحتياطية.'};
-}
-
 export async function aiTask(action:string,payload:any){
-  try{return await (await import('./scholar-engine')).smartTask(action,payload)}
-  catch(e){console.warn('ScholarMCP AI fallback:',e);return localFallback(action,payload)}
+  return (await import('./scholar-engine')).smartTask(action,payload);
 }
 
 export async function researchCrossref(q:string){const r=await fetch(`https://api.crossref.org/works?query.bibliographic=${encodeURIComponent(q)}&rows=10&select=DOI,title,author,issued,container-title,URL,type`);if(!r.ok)throw new Error('تعذر الاتصال بـ Crossref');const j=await r.json();return (j.message?.items||[]).map((p:any)=>{const title=p.title?.[0]||'';const authors=(p.author||[]).map((a:any)=>[a.given,a.family].filter(Boolean).join(' '));const year=p.issued?.['date-parts']?.[0]?.[0]||null;const journal=p['container-title']?.[0]||'';const doi=p.DOI||'';return {title,authors,year,journal,doi,url:doi?`https://doi.org/${doi}`:p.URL,citation:`${authors.join(', ')} (${year||'n.d.'}). ${title}. ${journal}${doi?`. https://doi.org/${doi}`:''}`}}).filter((x:any)=>x.title)}
