@@ -15,4 +15,9 @@ if('serviceWorker'in navigator&&import.meta.env.PROD){
   });
 }
 
-import('./ScholarApp').then(({default:App})=>ReactDOM.createRoot(rootEl).render(<React.StrictMode><ErrorBoundary><App/></ErrorBoundary></React.StrictMode>)).catch(fatal);
+const cloudPilot=window.location.pathname.replace(/\/$/,'')==='/cloud';
+if(cloudPilot){
+  import('./cloud/CloudApp').then(({default:App})=>ReactDOM.createRoot(rootEl).render(<React.StrictMode><ErrorBoundary><App/></ErrorBoundary></React.StrictMode>)).catch(fatal);
+}else{
+  import('./ScholarApp').then(({default:App})=>ReactDOM.createRoot(rootEl).render(<React.StrictMode><ErrorBoundary><App/></ErrorBoundary></React.StrictMode>)).catch(fatal);
+}
