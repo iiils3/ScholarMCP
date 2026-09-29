@@ -19,7 +19,7 @@ async function onboard(subject, input) {
       on conflict (auth_subject) do update set display_name = excluded.display_name, major = excluded.major, updated_at = now()
       returning id, display_name, major`;
     await tx`insert into credit_wallets (user_id, monthly_balance)
-      values (${users[0].id}, 0) on conflict (user_id) do nothing`;
+      values (${users[0].id}, 1) on conflict (user_id) do nothing`;
     return users[0];
   });
 }
