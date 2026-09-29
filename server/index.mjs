@@ -12,6 +12,10 @@ const db = postgres(process.env.DATABASE_URL, { max: 5, idle_timeout: 20 });
 const allowedOrigin = process.env.ALLOWED_ORIGIN;
 const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite';
 if (!/^[a-zA-Z0-9._-]+$/.test(model)) throw new Error('Invalid GEMINI_MODEL');
+const dailyLimit = Number(process.env.DAILY_SUMMARY_LIMIT || 50);
+const studentDailyLimit = Number(process.env.STUDENT_DAILY_SUMMARY_LIMIT || 3);
+if (![dailyLimit, studentDailyLimit].every(n => Number.isSafeInteger(n) && n > 0 && n <= 10000))
+  throw new Error('Invalid summary daily limits');
 
 function send(res, status, value) {
   res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'access-control-allow-origin': allowedOrigin, 'vary': 'Origin' });
@@ -92,10 +96,22 @@ async function reserve(user, { materialId, idempotencyKey }) {
       on conflict (user_id, idempotency_key) where idempotency_key is not null do nothing
       returning id`;
     if (!jobs.length) {
-      const existing = await tx`select id, material_id, status, result_artifact_id from ai_jobs where user_id = ${user} and idempotency_key = ${idempotencyKey}`;
+      const existing = await tx`
+        select j.id, j.material_id, j.status, j.result_artifact_id, a.data->>'summary' as summary
+        from ai_jobs j left join artifacts a on a.id = j.result_artifact_id and a.user_id = ${user}
+        where j.user_id = ${user} and j.idempotency_key = ${idempotencyKey}`;
       if (existing[0].material_id !== materialId) throw new ApiError(409, 'key_reused', 'Request key belongs to another material');
       return { existing: existing[0] };
     }
+    // Serialize quota checks across server instances before committing any provider work.
+    await tx`select pg_advisory_xact_lock(612533987654::bigint)`;
+    const [{ global_count, student_count }] = await tx`
+      select count(*)::int as global_count,
+        count(*) filter (where user_id = ${user})::int as student_count
+      from ai_jobs where kind = 'summary' and idempotency_key is not null
+        and queued_at >= now() - interval '24 hours'`;
+    if (global_count > dailyLimit || student_count > studentDailyLimit)
+      throw new ApiError(429, 'daily_limit', 'Summary quota reached; try later');
     const wallets = await tx`
       update credit_wallets set monthly_balance = monthly_balance - ${SUMMARY_CREDITS}, updated_at = now()
       where user_id = ${user} and monthly_balance >= ${SUMMARY_CREDITS}
@@ -119,17 +135,22 @@ async function generate(material) {
     const data = await response.json();
     const output = data.candidates?.[0]?.content?.parts?.map(part => part.text || '').join('').trim();
     if (!output) throw new Error('Empty provider response');
-    return output.slice(0, 20000);
+    return {
+      summary: output.slice(0, 20000),
+      inputTokens: Number(data.usageMetadata?.promptTokenCount) || null,
+      outputTokens: Number(data.usageMetadata?.candidatesTokenCount) || null,
+    };
   } finally { clearTimeout(timeout); }
 }
 
-async function complete(user, jobId, material, summary) {
+async function complete(user, jobId, material, result) {
   return db.begin(async tx => {
     const artifact = await tx`
       insert into artifacts (user_id, course_id, material_id, type, title, truth_status, data)
-      values (${user}, ${material.course_id}, ${material.id}, 'summary', ${`ملخص ${material.name}`}, 'unverified', ${tx.json({ summary, source: material.name })})
+      values (${user}, ${material.course_id}, ${material.id}, 'summary', ${`ملخص ${material.name}`}, 'unverified', ${tx.json({ summary: result.summary, source: material.name })})
       returning id`;
-    await tx`update ai_jobs set status = 'completed', charged_credits = ${SUMMARY_CREDITS}, result_artifact_id = ${artifact[0].id}, finished_at = now()
+    await tx`update ai_jobs set status = 'completed', charged_credits = ${SUMMARY_CREDITS}, result_artifact_id = ${artifact[0].id},
+      provider_name = 'gemini', model_code = ${model}, input_tokens = ${result.inputTokens}, output_tokens = ${result.outputTokens}, finished_at = now()
       where id = ${jobId} and user_id = ${user}`;
     return artifact[0].id;
   });
@@ -145,6 +166,16 @@ async function refund(user, jobId) {
     await tx`insert into credit_ledger (user_id, wallet_id, direction, bucket, amount, operation, job_id, idempotency_key)
       values (${user}, ${wallet[0].id}, 'credit', 'monthly', ${SUMMARY_CREDITS}, 'summary.refund', ${jobId}, ${`refund:${jobId}`})`;
   });
+}
+
+async function recoverStaleJobs() {
+  const stale = await db`select id, user_id from ai_jobs
+    where kind = 'summary' and idempotency_key is not null and status = 'running'
+      and started_at < now() - interval '5 minutes' limit 100`;
+  for (const job of stale) {
+    try { await refund(job.user_id, job.id); }
+    catch (error) { console.error('Could not refund stale summary job', { jobId: job.id, error }); }
+  }
 }
 
 const server = createServer(async (req, res) => {
@@ -170,11 +201,11 @@ const server = createServer(async (req, res) => {
     if (req.url === '/api/v1/courses') return send(res, 201, await addCourse(user, input));
     if (req.url === '/api/v1/materials/text') return send(res, 201, await addMaterial(user, input));
     const reservation = await reserve(user, validateSummary(input));
-    if (reservation.existing) return send(res, 200, { jobId: reservation.existing.id, status: reservation.existing.status, artifactId: reservation.existing.result_artifact_id });
+    if (reservation.existing) return send(res, 200, { jobId: reservation.existing.id, status: reservation.existing.status, artifactId: reservation.existing.result_artifact_id, summary: reservation.existing.summary });
     try {
-      const summary = await generate(reservation.material);
-      const artifactId = await complete(user, reservation.jobId, reservation.material, summary);
-      return send(res, 201, { jobId: reservation.jobId, status: 'completed', artifactId, summary, creditsCharged: SUMMARY_CREDITS });
+      const result = await generate(reservation.material);
+      const artifactId = await complete(user, reservation.jobId, reservation.material, result);
+      return send(res, 201, { jobId: reservation.jobId, status: 'completed', artifactId, summary: result.summary, creditsCharged: SUMMARY_CREDITS });
     } catch (error) {
       console.error('Summary failed', { jobId: reservation.jobId, error });
       await refund(user, reservation.jobId);
@@ -187,3 +218,5 @@ const server = createServer(async (req, res) => {
 });
 
 server.listen(Number(process.env.PORT || 8787), '0.0.0.0');
+recoverStaleJobs().catch(error => console.error('Stale-job recovery failed', error));
+setInterval(() => recoverStaleJobs().catch(error => console.error('Stale-job recovery failed', error)), 60000).unref();
