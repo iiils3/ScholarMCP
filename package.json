@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "qa": "node scripts/quality-gate.mjs",
+    "test:server": "node --test server/*.test.mjs",
+    "server": "node server/index.mjs",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b --pretty false"
@@ -15,10 +17,12 @@
     "@xyflow/react": "^12.10.2",
     "ankipack": "^0.3.0",
     "docx": "^9.5.1",
+    "jose": "6.2.12",
     "jszip": "^3.10.1",
     "lucide-react": "^0.544.0",
     "mammoth": "^1.10.0",
     "pdfjs-dist": "^5.4.149",
+    "postgres": "3.4.9",
     "pptxgenjs": "^4.0.1",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
