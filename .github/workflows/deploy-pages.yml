@@ -39,6 +39,9 @@ jobs:
         run: npm run typecheck
 
       - name: Build
+        env:
+          VITE_API_BASE_URL: https://br-purple-morning-aexdy7cc-summarypilot.compute.c-2.us-east-2.aws.neon.tech
+          VITE_NEON_AUTH_URL: https://ep-cold-haze-aettg0nr.neonauth.c-2.us-east-2.aws.neon.tech/neondb/auth
         run: npm run build
 
       - name: Configure Pages
