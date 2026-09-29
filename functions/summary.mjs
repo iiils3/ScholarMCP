@@ -9,7 +9,7 @@ for (const key of required) if (!process.env[key]) throw new Error(`Missing ${ke
 const jwks = createRemoteJWKSet(new URL(process.env.NEON_AUTH_JWKS_URL));
 const issuer = new URL(process.env.NEON_AUTH_BASE_URL).origin;
 const origin = process.env.ALLOWED_ORIGIN;
-const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite';
+const model = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
 if (!/^[a-zA-Z0-9._-]+$/.test(model)) throw new Error('Invalid GEMINI_MODEL');
 const dailyLimit = Number(process.env.DAILY_SUMMARY_LIMIT || 50);
 const studentDailyLimit = Number(process.env.STUDENT_DAILY_SUMMARY_LIMIT || 3);
