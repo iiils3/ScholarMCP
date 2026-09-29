@@ -35,7 +35,7 @@ async function identity(req) {
   const match = /^Bearer (\S+)$/i.exec(req.headers.authorization || '');
   if (!match) throw new ApiError(401, 'unauthorized', 'Sign in is required');
   try {
-    const { payload } = await jwtVerify(match[1], jwks, { issuer: process.env.AUTH_ISSUER, audience: process.env.AUTH_AUDIENCE, algorithms: ['RS256', 'ES256'] });
+    const { payload } = await jwtVerify(match[1], jwks, { issuer: process.env.AUTH_ISSUER, audience: process.env.AUTH_AUDIENCE, algorithms: ['EdDSA'] });
     if (!payload.sub) throw new Error('Missing subject');
     return payload.sub;
   } catch { throw new ApiError(401, 'unauthorized', 'Invalid session'); }
