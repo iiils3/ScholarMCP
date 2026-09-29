@@ -22,6 +22,7 @@ export function validateSummary(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new ApiError(400, 'invalid_body', 'Invalid JSON body');
   if (typeof input.materialId !== 'string' || !UUID.test(input.materialId)) throw new ApiError(400, 'invalid_material', 'A material ID is required');
   if (typeof input.idempotencyKey !== 'string' || !/^[a-zA-Z0-9_-]{12,100}$/.test(input.idempotencyKey)) throw new ApiError(400, 'invalid_idempotency_key', 'A unique request key is required');
+  if (input.sourceConsent !== true) throw new ApiError(400, 'consent_required', 'Consent to send source text to the model provider is required');
   return { materialId: input.materialId, idempotencyKey: input.idempotencyKey };
 }
 
