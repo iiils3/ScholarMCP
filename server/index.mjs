@@ -91,8 +91,8 @@ async function reserve(user, { materialId, idempotencyKey }) {
     const material = await tx`select id, course_id, name, extracted_text from materials where id = ${materialId} and user_id = ${user} and parse_status = 'ready'`;
     if (!material.length || !material[0].extracted_text) throw new ApiError(404, 'material_not_found', 'Material not found');
     const jobs = await tx`
-      insert into ai_jobs (user_id, course_id, material_id, kind, status, estimated_credits, idempotency_key, started_at)
-      values (${user}, ${material[0].course_id}, ${materialId}, 'summary', 'running', ${SUMMARY_CREDITS}, ${idempotencyKey}, now())
+      insert into ai_jobs (user_id, course_id, material_id, kind, status, estimated_credits, idempotency_key, source_consent_at, started_at)
+      values (${user}, ${material[0].course_id}, ${materialId}, 'summary', 'running', ${SUMMARY_CREDITS}, ${idempotencyKey}, now(), now())
       on conflict (user_id, idempotency_key) where idempotency_key is not null do nothing
       returning id`;
     if (!jobs.length) {
@@ -202,15 +202,17 @@ const server = createServer(async (req, res) => {
     if (req.url === '/api/v1/materials/text') return send(res, 201, await addMaterial(user, input));
     const reservation = await reserve(user, validateSummary(input));
     if (reservation.existing) return send(res, 200, { jobId: reservation.existing.id, status: reservation.existing.status, artifactId: reservation.existing.result_artifact_id, summary: reservation.existing.summary });
+    let result;
+    let artifactId;
     try {
-      const result = await generate(reservation.material);
-      const artifactId = await complete(user, reservation.jobId, reservation.material, result);
-      return send(res, 201, { jobId: reservation.jobId, status: 'completed', artifactId, summary: result.summary, creditsCharged: SUMMARY_CREDITS });
+      result = await generate(reservation.material);
+      artifactId = await complete(user, reservation.jobId, reservation.material, result);
     } catch (error) {
       console.error('Summary failed', { jobId: reservation.jobId, error });
       await refund(user, reservation.jobId);
       throw new ApiError(502, 'provider_failed', 'Summary could not be generated; credits refunded');
     }
+    return send(res, 201, { jobId: reservation.jobId, status: 'completed', artifactId, summary: result.summary, creditsCharged: SUMMARY_CREDITS });
   } catch (error) {
     if (!(error instanceof ApiError)) console.error('API request failed', error);
     return send(res, error instanceof ApiError ? error.status : 500, { error: error instanceof ApiError ? error.code : 'server_error', message: error instanceof ApiError ? error.message : 'Request failed' });
