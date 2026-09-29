@@ -96,3 +96,5 @@ npm run build
 ## Production status
 
 This repository is the active ScholarMCP beta. The published UI is still local-first. The next production step is an authenticated cloud pilot with a real identity provider, transaction tests on Neon, cost measurements and staged migration of the UI. Do not deploy the backend prototype as a public service yet.
+
+The isolated `/cloud` route contains the first text-to-summary pilot interface. It requires a configured identity provider and API host; without those settings it displays an unavailable message. It does not migrate or alter existing browser data in the main student interface.
