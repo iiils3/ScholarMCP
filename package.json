@@ -13,6 +13,7 @@
     "typecheck": "tsc -b --pretty false"
   },
   "dependencies": {
+    "@clerk/react": "^6.17.2",
     "@huggingface/transformers": "^4.2.0",
     "@xyflow/react": "^12.10.2",
     "ankipack": "^0.3.0",
