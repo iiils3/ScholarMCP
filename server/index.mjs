@@ -11,7 +11,7 @@ if (jwksUrl.protocol !== 'https:') throw new Error('AUTH_JWKS_URL must use HTTPS
 const jwks = createRemoteJWKSet(jwksUrl);
 const db = postgres(process.env.DATABASE_URL, { max: 5, idle_timeout: 20 });
 const allowedOrigin = process.env.ALLOWED_ORIGIN;
-const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite';
+const model = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
 if (!/^[a-zA-Z0-9._-]+$/.test(model)) throw new Error('Invalid GEMINI_MODEL');
 const dailyLimit = Number(process.env.DAILY_SUMMARY_LIMIT || 50);
 const studentDailyLimit = Number(process.env.STUDENT_DAILY_SUMMARY_LIMIT || 3);
