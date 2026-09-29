@@ -11,8 +11,8 @@ Upload once, then reuse the same source everywhere. AI-generated study material 
 ## Current beta architecture
 
 - **GitHub** — canonical source, CI quality gate, production build and GitHub Pages hosting.
-- **Cloud AI bridge** — heavy LLM, OCR and lecture transcription run in the cloud; students do not download multi-hundred-MB AI models to weak phones.
-- **Neon PostgreSQL** — dedicated ScholarMCP production database project prepared for the account/sync/credits layer.
+- **Current browser engines** — Qwen, OCR and Whisper still run on the student's device in the published beta. The cloud summary backend in `server/` is an undeployed prototype; see its README before connecting it.
+- **Neon PostgreSQL** — versioned schema for accounts and credits exists; the published frontend is not synchronized to it yet.
 - **Browser data layer** — current beta keeps the student's course state and original source cache available in-browser while account synchronization is completed.
 - **FSRS** — spaced-repetition scheduling remains lightweight and instant on-device.
 
@@ -81,7 +81,7 @@ npm run typecheck
 npm run build
 ```
 
-The QA gate fails the deployment if core routes or major product surfaces are disconnected, including cloud AI/OCR, Course Brain, Lecture Intelligence, Academic OS, Seminar Studio, Exam DNA, Smart Feed or Scholar Day.
+The QA gate checks structural wiring and specific strings; it does not verify actual AI quality, cloud integration, account isolation, or credit transactions. The cloud prototype has focused validation tests via `npm run test:server`.
 
 ## Development
 
@@ -95,4 +95,4 @@ npm run build
 
 ## Production status
 
-This repository is the active ScholarMCP beta. The next production infrastructure step is account/sync/credit metering on Neon and a dedicated Scholar inference backend when usage economics justify moving from the beta cloud bridge to owned GPU capacity.
+This repository is the active ScholarMCP beta. The published UI is still local-first. The next production step is an authenticated cloud pilot with a real identity provider, transaction tests on Neon, cost measurements and staged migration of the UI. Do not deploy the backend prototype as a public service yet.
