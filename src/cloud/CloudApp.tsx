@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react';
-import { ClerkProvider, SignInButton, SignUpButton, UserButton, useAuth, useUser } from '@clerk/react';
+import { createAuthClient } from '@neondatabase/neon-js/auth';
+import { BetterAuthVanillaAdapter } from '@neondatabase/neon-js';
 import './cloud.css';
 
 const apiBase=String(import.meta.env.VITE_API_BASE_URL||'').replace(/\/$/,'');
-const key=String(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY||'');
+const authUrl=String(import.meta.env.VITE_NEON_AUTH_URL||'');
+const createPilotAuth=(url:string)=>createAuthClient(url,{adapter:BetterAuthVanillaAdapter({fetchOptions:{credentials:'include'}})});
 type Course={id:string;name:string};
 type Material={id:string;name:string};
 type Wallet={monthly_balance:number;topup_balance:number;plan_code:string};
 
-function Pilot(){
-  const {isLoaded,isSignedIn,getToken}=useAuth();
-  const {user}=useUser();
+function Pilot({authClient}:{authClient:ReturnType<typeof createPilotAuth>}){
+  const [isLoaded,setLoaded]=useState(false);const [isSignedIn,setSignedIn]=useState(false);
+  const [email,setEmail]=useState('');const [password,setPassword]=useState('');const [signUp,setSignUp]=useState(false);
   const [name,setName]=useState('');const [major,setMajor]=useState('');
   const [courseName,setCourseName]=useState('');const [course,setCourse]=useState<Course|null>(null);
   const [materialName,setMaterialName]=useState('');const [text,setText]=useState('');
@@ -20,20 +22,23 @@ function Pilot(){
   const [wallet,setWallet]=useState<Wallet|null>(null);const [busy,setBusy]=useState(false);const [error,setError]=useState('');
 
   async function call<T>(path:string,method:'GET'|'POST'='POST',payload?:unknown):Promise<T>{
-    const token=await getToken({template:'scholar-api'});
-    if(!token)throw new Error('تعذر الحصول على جلسة API. تحقق من إعداد قالب JWT.');
+    const {data,error:authError}=await authClient.token();
+    const token=data?.token;
+    if(authError||!token)throw new Error('انتهت الجلسة. سجل الدخول مجدداً.');
     const response=await fetch(`${apiBase}${path}`,{method,headers:{authorization:`Bearer ${token}`,'content-type':'application/json'},body:payload===undefined?undefined:JSON.stringify(payload)});
     const result=await response.json();
     if(!response.ok){const error=new Error(result.message||result.error||'تعذر إكمال الطلب') as Error&{code?:string};error.code=result.error;throw error}
     return result as T;
   }
   async function run(task:()=>Promise<void>){setBusy(true);setError('');try{await task()}catch(e){setError(e instanceof Error?e.message:'حدث خطأ')}finally{setBusy(false)}}
-  useEffect(()=>{if(isSignedIn)setName(user?.fullName||'')},[isSignedIn,user?.fullName]);
+  useEffect(()=>{let active=true;authClient.getSession().then(({data})=>{if(active){setSignedIn(!!data?.session);setName(data?.user?.name||'');setLoaded(true)}}).catch(()=>{if(active)setLoaded(true)});return()=>{active=false}},[authClient]);
+  async function authenticate(){await run(async()=>{const result=signUp?await authClient.signUp.email({name:email.split('@')[0]||'طالب',email,password}):await authClient.signIn.email({email,password});if(result.error)throw new Error(result.error.message||'تعذر تسجيل الدخول');const session=await authClient.getSession();if(!session.data?.session)throw new Error('تحقق من بريدك الإلكتروني ثم سجل الدخول.');setSignedIn(true);setName(session.data.user?.name||'')})}
+  async function signOut(){await run(async()=>{const result=await authClient.signOut();if(result.error)throw new Error(result.error.message||'تعذر الخروج');setSignedIn(false);setWallet(null);setCourse(null);setMaterial(null);setSummary('')})}
   if(!isLoaded)return <main className="cloud-shell"><p>جاري تجهيز الحساب…</p></main>;
   return <main className="cloud-shell" dir="rtl">
-    <header><div><strong>ScholarMCP</strong><span>تجربة المسار السحابي</span></div><a href="/">العودة للنسخة الحالية</a>{isSignedIn&&<UserButton/>}</header>
+    <header><div><strong>ScholarMCP</strong><span>تجربة المسار السحابي</span></div><a href="/">العودة للنسخة الحالية</a>{isSignedIn&&<button className="cloud-signout" onClick={signOut}>تسجيل الخروج</button>}</header>
     <section className="cloud-hero"><span>نسخة تجريبية محدودة</span><h1>من نص محاضرتك إلى ملخص محفوظ بحسابك</h1><p>الملخص مولّد آلياً ويحتاج مراجعة مقابل المصدر. هذه التجربة تقبل النص فقط، وتعرض الرصيد قبل كل طلب.</p></section>
-    {!isSignedIn?<section className="cloud-card"><h2>ادخل بحسابك للتجربة</h2><div className="cloud-actions"><SignInButton mode="modal"><button>تسجيل الدخول</button></SignInButton><SignUpButton mode="modal"><button className="secondary">إنشاء حساب</button></SignUpButton></div></section>:<>
+    {!isSignedIn?<section className="cloud-card cloud-auth"><h2>{signUp?'إنشاء حساب':'تسجيل الدخول'}</h2><form onSubmit={e=>{e.preventDefault();void authenticate()}}><label>البريد الإلكتروني<input type="email" autoComplete="email" required value={email} onChange={e=>setEmail(e.target.value)}/></label><label>كلمة المرور<input type="password" minLength={8} autoComplete={signUp?'new-password':'current-password'} required value={password} onChange={e=>setPassword(e.target.value)}/></label><div className="cloud-actions"><button disabled={busy}>{busy?'جاري التنفيذ…':signUp?'إنشاء حساب':'دخول'}</button><button type="button" className="secondary" onClick={()=>setSignUp(!signUp)}>{signUp?'عندي حساب':'حساب جديد'}</button></div></form></section>:<>
       <section className="cloud-grid">
         <div className="cloud-card"><small>01 — الملف الدراسي</small><h2>فعّل حسابك</h2><label>اسمك<input value={name} maxLength={100} onChange={e=>setName(e.target.value)}/></label><label>تخصصك<input value={major} maxLength={100} onChange={e=>setMajor(e.target.value)}/></label><button disabled={busy||!name.trim()} onClick={()=>run(async()=>{await call('/api/v1/onboard','POST',{name,major});setWallet(await call('/api/v1/wallet','GET'))})}>حفظ وعرض الرصيد</button>{wallet&&<p className="cloud-balance">رصيد التجربة: {wallet.monthly_balance} كريدت</p>}</div>
         <div className="cloud-card"><small>02 — المادة</small><h2>أضف مادة</h2><label>اسم المادة<input value={courseName} maxLength={160} onChange={e=>setCourseName(e.target.value)} placeholder="مثلاً: الكيمياء العضوية"/></label><button disabled={busy||!wallet||!courseName.trim()} onClick={()=>run(async()=>{setCourse(await call<Course>('/api/v1/courses','POST',{name:courseName}));setMaterial(null);setSummary('');setRequestKey('');setSourceConsent(false)})}>إنشاء المادة</button>{course&&<p>المادة المختارة: <b>{course.name}</b></p>}</div>
@@ -47,6 +52,6 @@ function Pilot(){
 }
 
 export default function CloudApp(){
-  if(!apiBase||!key)return <main className="cloud-shell" dir="rtl"><section className="cloud-card"><h1>التجربة السحابية غير مفعّلة</h1><p>يلزم إعداد عنوان API ومفتاح النشر الخاص بمزوّد تسجيل الدخول قبل فتحها.</p><a href="/">العودة للموقع</a></section></main>;
-  return <ClerkProvider publishableKey={key}><Pilot/></ClerkProvider>;
+  if(!apiBase||!authUrl)return <main className="cloud-shell" dir="rtl"><section className="cloud-card"><h1>التجربة السحابية غير مفعّلة</h1><p>يلزم إعداد عنوان API وعنوان تسجيل الدخول قبل فتحها.</p><a href="/">العودة للموقع</a></section></main>;
+  return <Pilot authClient={createPilotAuth(authUrl)}/>;
 }
